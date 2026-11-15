@@ -175,6 +175,23 @@ class TestSovereignDecorator(unittest.TestCase):
         self.assertIn("[redacted_path]", A.scrub("file:///C:/Users/testuser/y.md"))
         self.assertIn("[redacted_path]", A.scrub("/home/user/secret.md"))
 
+    def test_every_local_path_form_is_scrubbed_whole(self):
+        for text in (r"at C:\Users\testuser\x.md now", "at C:/Users/testuser/x.md now", "at c:\\tmp\\x.log now",
+                     "at file:///C:/Users/testuser/x.md now", "at file:///home/testuser/x.md now",
+                     "at /Users/testuser/x.md now", "at /home/testuser/x.md now", "at /sessions/abc/x now"):
+            with self.subTest(text=text):
+                self.assertEqual(A.scrub(text), "at [redacted_path] now")
+
+    def test_a_web_url_is_not_a_local_path(self):
+        """https: is not a drive letter and example.com/home is not a home folder."""
+        for text in ("see https://example.com/home/pricing", "see http://example.com/Users/guide",
+                     "see https://a.b/sessions/x", "ratio 3:1 and a:b", "src/home/widgets.py"):
+            with self.subTest(text=text):
+                self.assertEqual(A.scrub(text), text)
+
+    def test_a_path_in_backticks_keeps_its_backticks(self):
+        self.assertEqual(A.scrub("see `C:\\tmp\\x` here"), "see `[redacted_path]` here")
+
     def test_the_settings_digest_changes_with_the_settings(self):
         before = A.digest()
         A.SOFTEN_ABOVE, keep = 0.5, A.SOFTEN_ABOVE

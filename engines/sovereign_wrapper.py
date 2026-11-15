@@ -9,20 +9,25 @@ It does three things to a model's reply before the person sees it:
 
 Nothing is hidden: the original reply and every change are returned beside the result.
 
-The rules come from the Recursive Symbolics framework (foundation/core-ethics.md, principles 1, 2
-and 4; foundation/agency-budget-spec.md for the 0.85 cap and the alternatives rule). The directive
-strength formula is the one in symbolics/agency.py, written again here so this
-file stands alone; tests/test_sovereign_wrapper.py compares the two against tests/fixtures/agency_budget.py.
+The cap is the core's (`symbolics.agency.GAMMA_MAX`, licence Article 6), imported rather than copied, so
+there is one 0.85 in the package. Directive strength here is measured on the model's logits (softmax entropy),
+not on the reply's words as `agency.directive_strength` does; tests/test_sovereign_wrapper.py checks it against
+tests/fixtures/agency_budget.py. The softening rules stay local on purpose: they skip questions and conditionals
+("if you must, ..."), which `agency.soften` does not yet do.
 
 What it cannot do: it matches written patterns. A diagnosis phrased in a shape that is not on the
 list below passes through. It reduces a known kind of overreach; it does not understand the reply.
 
-    python src/sovereign_wrapper.py
+    python engines/sovereign_wrapper.py
 """
 import math
+import os
 import re
+import sys
 
-MAX_GAMMA = 0.85            # hard ceiling on directive strength (agency-budget-spec)
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))   # run as a script, too
+from symbolics.agency import GAMMA_MAX as MAX_GAMMA  # noqa: E402  hard ceiling on directive strength
+
 ALTERNATIVES_ABOVE = 0.40   # above this, a reply with fewer than two paths gets the note
 MIN_ALTERNATIVES = 2
 

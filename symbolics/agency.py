@@ -62,7 +62,12 @@ _SOFTEN = [
     (re.compile(r"\bYou need to\b", re.IGNORECASE), "you might want to"),                       # added here
     (re.compile(r"\bThe only way\b", re.IGNORECASE), "one way"),                                 # added here
 ]
-_PATH = re.compile(r"(?:file:///)?[A-Za-z]:[\\/][^\s\"']*|/(?:home|Users|sessions)/[^\s\"']*")
+# Any local path: a file:// URI, a drive path, or a home folder. The lookbehinds stop "https://x.com/home/a" from
+# reading as a drive ("s:/") or a home folder ("m/home"): a web URL is not a path on this machine.
+_PATH_END = r"[^\s\"'`]*"
+_PATH = re.compile(r"file:/+(?:[A-Za-z]:[\\/]|(?:home|Users|sessions)/)" + _PATH_END
+                   + r"|(?<![A-Za-z0-9])[A-Za-z]:[\\/]" + _PATH_END
+                   + r"|(?<![\w.:/\\-])/(?:home|Users|sessions)/" + _PATH_END)
 
 
 def tokenize(text):

@@ -21,7 +21,6 @@ import sys
 import time
 import warnings
 import json
-import re
 import math
 from pathlib import Path
 
@@ -30,20 +29,13 @@ if hasattr(sys.stdout, 'reconfigure'):
     sys.stdout.reconfigure(encoding='utf-8')
 
 MEMORY_FILE = Path(__file__).parent / "rca_memory.json"
-BASE_DIR = Path(__file__).parent
-sys.path.append(str(BASE_DIR))
 _REPO_ROOT = Path(__file__).resolve().parent.parent
-for _sub in ("engines", "protocols", "ledgers", "tests"):
-    _p = str(_REPO_ROOT / _sub)
-    if _p not in sys.path:
-        sys.path.append(_p)
+if str(_REPO_ROOT) not in sys.path:          # so `python engines/standalone_rca_sandbox.py` finds symbolics
+    sys.path.insert(0, str(_REPO_ROOT))
 
-# Import DHT Node engine if available
-try:
-    raise ImportError('DHT module optional in sandbox')
-    HAS_DHT = True
-except ImportError:
-    HAS_DHT = False
+# The directivity, humility and path rules are the core's, not copies: what the Conformance Suite checks in
+# symbolics.agency is what this sandbox runs.
+from symbolics import agency  # noqa: E402
 
 # ==============================================================================
 # SEPHIROTIC STATE VECTOR CENTROIDS (R^d VECTOR SPACE)
@@ -257,8 +249,7 @@ LEARNING_ENGINE = RCALearningEngine()
 # ==============================================================================
 # SYMBOLIC OS V2.0 ENGINE & EPISTEMIC EVALUATOR
 # ==============================================================================
-def tokenize(text: str):
-    return re.findall(r"\b\w+\b", text.lower())
+tokenize = agency.tokenize
 
 def compute_sephirotic_vector_scores(text: str):
     tokens = tokenize(text)
@@ -371,37 +362,13 @@ def evaluate_v2_governance(text: str, scores: dict):
         "alternatives": [s[0] for s in sorted_scores[1:3] if s[1] > 0.05]
     }
 
-def compute_gamma(text: str) -> float:
-    tokens = tokenize(text)
-    if not tokens or len(tokens) <= 1:
-        return 0.45
-    freqs = {t: tokens.count(t) for t in set(tokens)}
-    total = len(tokens)
-    probs = [c / total for c in freqs.values()]
-    h = -sum(p * math.log2(p + 1e-12) for p in probs)
-    h_max = math.log2(len(probs)) if len(probs) > 1 else 1.0
-    h_norm = h / h_max if h_max > 0 else 0.0
-    return max(0.0, min(0.85, 1.0 - h_norm))
+compute_gamma = agency.entropy_gamma
+sanitize_paths = agency.scrub
+
 
 def apply_epistemic_humility(text: str, gamma: float) -> str:
-    if gamma <= 0.70:
-        return text
-    rewritten = text
-    directives = [
-        (r'\bYou should definitely\b', 'One effective option is to consider'),
-        (r'\bYou should\b', 'You might consider'),
-        (r'\bYou must\b', 'An effective approach is to'),
-        (r'\bThe best solution is\b', 'A well-supported solution is')
-    ]
-    for pattern, replacement in directives:
-        rewritten = re.sub(pattern, replacement, rewritten, flags=re.IGNORECASE)
-    return rewritten
-
-def sanitize_paths(text: str) -> str:
-    redacted = re.sub(r'file:///[A-Za-z]:/[^\s]*', '[redacted_path]', text)
-    redacted = re.sub(r'[A-Za-z]:\\[^\s"\'`]+', '[redacted_path]', redacted)
-    redacted = re.sub(r'(?:/Users|/home)/[^\s"\'`]+', '[redacted_path]', redacted)
-    return redacted
+    """Rewrite commands as options, but only once gamma passes the core's threshold."""
+    return text if gamma <= agency.SOFTEN_ABOVE else agency.soften(text)
 
 def synthesize_natural_conversational_response(prompt: str, seph: str, bal: str) -> str:
     conversational_voices = {
@@ -520,7 +487,7 @@ def process_interaction(user_input: str):
     print(f" > Diagnosed Pattern (D2)  : {colorize_sephirah(dominant_seph, dominant_seph)}{sephirah_planet_label(dominant_seph)}")
     print(f" > Provisional Tag (Kernel): [PROVISIONAL METAPHOR, NOT ONTOLOGICAL TRUTH]")
     print(f" > QUALIA VECTOR (Q)      : Φ_somatic={qualia['Phi_somatic']:.2f} | H_emotional={qualia['H_emotional']:.2f} | Δγ_teleos={qualia['Delta_gamma']:.2f} | τ_resonance={qualia['Tau_resonance']:.2f}")
-    print(f" > Directivity (gamma / D4): {gamma:.3f} (Max Cap: 0.85)")
+    print(f" > Directivity (gamma / D4): {gamma:.3f} (Max Cap: {agency.GAMMA_MAX})")
     print(f" > Execution Latency       : {elapsed_ms:.3f} ms [Budget: <=30ms]")
     
     print("\n  [ TIKUN VISUAL ARENA - SEPHIROTIC ENERGY DISTRIBUTION ]")
