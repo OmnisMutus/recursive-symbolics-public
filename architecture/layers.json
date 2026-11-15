@@ -1,0 +1,213 @@
+{
+  "about": "Index mapping each layer of the Recursive Symbolics Engine Architecture to concrete files and test evidence. Checked by python -m symbolics.layers.",
+  "source_note": "ASSEMBLY_GUIDE.md & README.md",
+  "stage": {
+    "current": 1,
+    "name": "Collaborative Foundation",
+    "meaning": "Public self-contained architecture skeleton with zero private dependencies."
+  },
+  "layers": [
+    {
+      "layer": "Kether",
+      "role": "Intent",
+      "purpose": "Declare system intent and constitutional boundaries.",
+      "components": [
+        {
+          "repo": "recursive-symbolics",
+          "path": "architecture/intent.json",
+          "what": "Machine-readable intent checked verbatim against README.md and AGENTS.md.",
+          "evidence": "tests/test_layers.py"
+        },
+        {
+          "repo": "recursive-symbolics",
+          "path": "AGENTS.md",
+          "what": "Contributor rules and constitutional invariants."
+        },
+        {
+          "repo": "recursive-symbolics",
+          "path": "ETHICS.md",
+          "what": "System refusals and where each refusal lives in code."
+        }
+      ],
+      "gaps": [
+        "architecture/intent.json stays in DRAFT until ratified by a repository Maintainer."
+      ]
+    },
+    {
+      "layer": "Chokmah / Binah",
+      "role": "Design",
+      "purpose": "Translate intent into protocols, vocabulary, and verification standards.",
+      "components": [
+        {
+          "repo": "recursive-symbolics",
+          "path": "architecture/symbolic_api.json",
+          "what": "Canonical symbolic operator vocabulary."
+        },
+        {
+          "repo": "recursive-symbolics",
+          "path": "symbolics/interfaces.py",
+          "what": "Protocol and ABC contracts (SymbolicBackend, RuleEngine, MemoryStore, ExecutionSandbox).",
+          "evidence": "tests/test_interfaces_and_examples.py"
+        },
+        {
+          "repo": "recursive-symbolics",
+          "path": "STANDARD.md",
+          "what": "Independent ground truth, boundary cases, and break-it proof criteria."
+        },
+        {
+          "repo": "recursive-symbolics",
+          "path": "ASSEMBLY_GUIDE.md",
+          "what": "Developer integration contracts for custom backends and persistent stores."
+        }
+      ],
+      "gaps": []
+    },
+    {
+      "layer": "Chesed",
+      "role": "Expansion",
+      "purpose": "Pluggable reference implementations and extensions.",
+      "components": [
+        {
+          "repo": "recursive-symbolics",
+          "path": "examples/algebra_simplifier.py",
+          "what": "Zero-dependency symbolic algebra backend and RuleEngine.",
+          "evidence": "tests/test_interfaces_and_examples.py"
+        },
+        {
+          "repo": "recursive-symbolics",
+          "path": "examples/propositional_reducer.py",
+          "what": "Zero-dependency propositional logic reducer with truth-table ground truth.",
+          "evidence": "tests/test_interfaces_and_examples.py"
+        },
+        {
+          "repo": "recursive-symbolics",
+          "path": "symbolics/family_f.py",
+          "what": "Deterministic D_22 dihedral permutation solver and verification gate.",
+          "evidence": "tests/test_family_f.py"
+        }
+      ],
+      "gaps": []
+    },
+    {
+      "layer": "Geburah",
+      "role": "Boundary",
+      "purpose": "Enforce constraints, depth bounds, and privacy.",
+      "components": [
+        {
+          "repo": "recursive-symbolics",
+          "path": "symbolics/ethics.py",
+          "what": "The emit() firewall: caveat, tradition, source, anchors, and non-ranking filter.",
+          "evidence": "tests/test_address_and_ethics.py"
+        },
+        {
+          "repo": "recursive-symbolics",
+          "path": "symbolics/conformance.py",
+          "what": "Executable license duties (Articles 5.1(D), 6, 8, 9).",
+          "evidence": "tests/conformance/test_conformance.py"
+        },
+        {
+          "repo": "recursive-symbolics",
+          "path": "symbolics/outgoing.py",
+          "what": "Scans files and patches for leaked home-folder paths.",
+          "evidence": "tests/test_outgoing.py"
+        },
+        {
+          "repo": "recursive-symbolics",
+          "path": "engines/safe_memory_boundary_engine.py",
+          "what": "Checked 32-bit multiplication and heap boundary guard."
+        }
+      ],
+      "gaps": []
+    },
+    {
+      "layer": "Tiphareth",
+      "role": "Integration",
+      "purpose": "Synthesize verification results honestly.",
+      "components": [
+        {
+          "repo": "recursive-symbolics",
+          "path": "symbolics/ledger.py",
+          "what": "CorrespondenceLedger classifying claims into VERIFIED, FAILED, or UNTESTABLE.",
+          "evidence": "tests/test_ledger.py"
+        },
+        {
+          "repo": "recursive-symbolics",
+          "path": "examples/quickstart.py",
+          "what": "Single entry-point end-to-end architectural demonstration."
+        }
+      ],
+      "gaps": []
+    },
+    {
+      "layer": "Da'ath",
+      "role": "Cavity",
+      "purpose": "Represent unknowns, cycle traps, and divergence explicitly.",
+      "components": [
+        {
+          "repo": "recursive-symbolics",
+          "path": "symbolics/ledger.py",
+          "what": "UNTESTABLE is a first-class ledger status; all-untestable runs never pass.",
+          "evidence": "tests/test_ledger.py"
+        },
+        {
+          "repo": "recursive-symbolics",
+          "path": "engines/recursive_attractor_engine.py",
+          "what": "AbyssException base-case breaker for non-finite and divergent trajectories."
+        }
+      ],
+      "gaps": [
+        "Dynamic runtime unknowns outside registered ledgers remain local to trace logs."
+      ]
+    },
+    {
+      "layer": "Yesod",
+      "role": "Foundation",
+      "purpose": "Provide coordinate substrates, directivity budgets, and sandboxed state.",
+      "components": [
+        {
+          "repo": "recursive-symbolics",
+          "path": "symbolics/address.py",
+          "what": "Three-axis coordinate space and immutable Lenses.",
+          "evidence": "tests/test_address_and_ethics.py"
+        },
+        {
+          "repo": "recursive-symbolics",
+          "path": "symbolics/metrics.py",
+          "what": "Observable measurement layer producing addresses.",
+          "evidence": "tests/test_metrics.py"
+        },
+        {
+          "repo": "recursive-symbolics",
+          "path": "symbolics/agency.py",
+          "what": "Agency budget and gamma <= 0.85 ceiling.",
+          "evidence": "tests/test_agency.py"
+        },
+        {
+          "repo": "recursive-symbolics",
+          "path": "engines/athanor.py",
+          "what": "Transactional GGUF inspection and copy-on-write undo journal."
+        }
+      ],
+      "gaps": []
+    },
+    {
+      "layer": "Malkuth",
+      "role": "Mirror",
+      "purpose": "Reflect verifiable system state.",
+      "components": [
+        {
+          "repo": "recursive-symbolics",
+          "path": "symbolics/layers.py",
+          "what": "Architecture index & intent quotation checker.",
+          "evidence": "tests/test_layers.py"
+        },
+        {
+          "repo": "recursive-symbolics",
+          "path": "tests/test_sanitization_audit.py",
+          "what": "Automated PII, path, and broken-import verification suite."
+        }
+      ],
+      "gaps": []
+    }
+  ]
+}

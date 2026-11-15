@@ -1,0 +1,54 @@
+{
+  "about": "Machine-readable intent anchored verbatim to source documentation. tests/test_layers.py fails on drift.",
+  "status": "DRAFT",
+  "ratified": false,
+  "ratified_by": null,
+  "ratified_on": null,
+  "how_to_ratify": "Edit statements as Maintainer, then set ratified to true, ratified_by, and ratified_on.",
+  "name": "recursive-symbolics",
+  "purpose": {
+    "text": "It takes a symbolic state from any caller and returns typed records",
+    "source": "README.md"
+  },
+  "principles": [
+    {
+      "text": "A lens can never write back into an address",
+      "source": "README.md"
+    },
+    {
+      "text": "Every reading carries its caveat, names the tradition and the source it read from, and points at the words it came from.",
+      "source": "README.md"
+    },
+    {
+      "text": "No output may rank a person, and none may command: it offers.",
+      "source": "README.md"
+    },
+    {
+      "text": "Nothing is forced to a verdict.",
+      "source": "README.md"
+    },
+    {
+      "text": "This engine reads the person asking, and no one else.",
+      "source": "README.md"
+    },
+    {
+      "text": "Nothing reaches the network.",
+      "source": "AGENTS.md"
+    },
+    {
+      "text": "The Conformance Suite is the answer about compliance, not your judgement of it.",
+      "source": "AGENTS.md"
+    },
+    {
+      "text": "Corrections to the record are new entries, never edits that erase what was believed before. The one exception is removing what must not be kept, such as a key or a private path, and the removal is itself recorded as an entry.",
+      "source": "README.md"
+    }
+  ],
+  "ratification": {
+    "required_for": [
+      "intent_change",
+      "stage_transition"
+    ],
+    "approver": "the Maintainer"
+  }
+}

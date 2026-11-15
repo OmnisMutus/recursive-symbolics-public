@@ -1,0 +1,16 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+build/
+dist/
+logs/
+*.log
+*.jsonl
+rca_memory.json
+.DS_Store
+Thumbs.db
+
+# private sanitization denylist (maintainer-local, never committed)
+.sanitize-denylist
