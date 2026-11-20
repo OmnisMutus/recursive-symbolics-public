@@ -305,8 +305,9 @@ class WindowsFileLocks(unittest.TestCase):
         with self.assertRaises(Held):
             workshop._retrying(fn)
         self.assertEqual(len(calls), workshop.TRIES)
-        self.assertEqual(len(self.sleeps), workshop.TRIES - 1)
-        self.assertEqual(sum(self.sleeps), workshop.WAIT * sum(range(1, workshop.TRIES)))
+        # Each wait exactly, not their sum: summing floats differs in the last bit between Python versions (3.12
+        # made sum() compensated), which the 3.11 CI runner showed on 2026-11-20.
+        self.assertEqual(self.sleeps, [workshop.WAIT * k for k in range(1, workshop.TRIES)])
 
     def test_no_other_error_is_retried(self):
         for error in (Denied, PermissionError, FileNotFoundError, OSError):

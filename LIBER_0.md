@@ -42,6 +42,21 @@ or "none: <the reason no test can>". Required when the Result says FAILED or COR
 
 ## Entries
 
+### 2026-11-20: a new test compared a float sum exactly, and Python 3.11 disagreed in the last bit
+
+**Attempted:** The second CI run (44836872430), after the two fixes below.
+
+**Result:** CORRECTED. `corpus` and `workspace` passed; `test` failed on Python 3.11 in a test added today,
+`test_it_gives_up_after_the_last_try_and_raises_the_lock`: `AssertionError: 2.2500000000000004 != 2.25`. The test
+compared the sum of nine float waits with one product. Since Python 3.12, `sum()` uses compensated summation and the
+two agree exactly, which is why it passed on this machine (3.14). The code was right; the test was too exact in the
+wrong place. It now compares the list of waits one by one, which is also stronger. Checked before pushing: the full
+suite passes on CPython 3.11.15 and on 3.14, 561 tests each, 4 skipped.
+
+**Guard:** tests/athanor_tests/test_review_regressions.py::test_it_gives_up_after_the_last_try_and_raises_the_lock
+
+**Notes:** Run a new test on the oldest supported Python before pushing, not only on the newest.
+
 ### 2026-11-20: the first CI run, on a clean Linux runner, found two things this machine could not
 
 **Attempted:** Publish the repository and run CI for the first time (run 44834253000).
