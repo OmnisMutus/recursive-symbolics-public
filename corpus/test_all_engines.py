@@ -82,8 +82,10 @@ ENGINES = [
         "tests/test_strict_honest_benchmark_suite.py", []),
     # --- Added after a full file-by-file sweep of solo/ found these were on disk
     # but never registered here, meaning they were invisible to every prior
-    # "X / N engines" count this file has ever reported. None have dedicated
-    # correctness tests yet, so all can only ever report RAN_ONLY here.
+    # "X / N engines" count this file has ever reported. When added they had no
+    # dedicated correctness tests, so they could only report RAN_ONLY; each has
+    # one now (the third field below). Corrected 2026-11-20: this comment still
+    # said "none have tests yet" after all five did.
     ("engines/ctypes_math_accelerator.py", "Ctypes-Based Vector Math Accelerator",
         "tests/test_ctypes_math_accelerator.py", []),
     ("engines/p2p_swarm_mesh_engine.py", "UDP Swarm Mesh Peer Discovery Engine",

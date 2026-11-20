@@ -23,7 +23,8 @@ that a thing *is* a sephirah is refused; that it *reads as* one, under a named l
 description did not already explain is noise wearing a robe, and `occam()` says so.
 
 Plus the agency budget inherited from the framework: directive strength capped at 0.85, so the agent offers
-and does not command, with alternatives appended as the cap is approached.
+and does not command, with alternatives appended as the cap is approached. The cap is imported from
+`symbolics.agency.GAMMA_MAX`, so there is one value in the repository (tests/test_one_cap.py checks this).
 
 A note on what this cannot do. It reads text for the shapes of overclaiming. It cannot know whether a
 correspondence is apt, and it does not try: a claim can pass every duty here and still be wrong about the
@@ -36,7 +37,7 @@ import re
 CORE_AXIOM = ("True symbolic systems do not believe their own symbols — they operate them with calibrated "
               "epistemic humility as maps, not territory.")
 PROVISIONAL = "PROVISIONAL METAPHOR"
-GAMMA_CAP = 0.85
+from symbolics.agency import GAMMA_MAX as GAMMA_CAP  # noqa: E402  the one 0.85 (licence Article 6), not a copy
 
 # The framework's own Confidence Ranking (verification-standards.md). Distinct from the percentage: the
 # percentage says how well-evidenced a reading is, the rank says what KIND of evidence exists at all. Rank 4

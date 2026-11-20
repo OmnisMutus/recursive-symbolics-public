@@ -42,6 +42,28 @@ or "none: <the reason no test can>". Required when the Result says FAILED or COR
 
 ## Entries
 
+### 2026-11-20: the 0.85 cap had two definitions; now it has one, and a test keeps it that way
+
+**Attempted:** Close a drift path an outside review pointed at: rules written down in more than one place.
+
+**Result:** CORRECTED. The licence's directive cap (Article 6, 0.85) was defined twice: `symbolics/agency.py`
+(`GAMMA_MAX`) and `reference_agent/governance.py` (`GAMMA_CAP = 0.85`, a copy). Changing one would have left the
+other behind, and nothing would have failed: the `layers` check compares files and quoted sentences, not constants.
+`governance.py` now imports `GAMMA_MAX` (on the same line, so no mutation label moved; a docstring line added above
+did move two, now updated). `tests/test_one_cap.py` parses every module in `symbolics`, `engines`,
+`reference_agent`, `athanor` and `examples`, and fails if any of them other than `agency.py` binds a name or a
+default argument to 0.85. Before trusting it, the test shows its scanner finds a planted copy in each form, and it
+found the old line (line 40) when the copy was put back in memory. Full suite 565 tests OK on Python 3.14 and 3.11;
+`governance.py` mutation 32 of 34, 2 exempt, 0 survivors.
+
+**Guard:** tests/test_one_cap.py::test_only_agency_defines_it, tests/test_one_cap.py::test_the_modules_that_use_a_cap_hold_agencys_own
+
+**Notes:** Two other duplications from the same review stay open: the ledger framework exists in `symbolics/` and in
+`corpus/ledgers/` (nearly the same code), and `symbolic_api.json` exists in two versions that differ. The corpus copies
+are its own history and were left alone on purpose; whether to make the core the single source for them is a
+separate decision. `symbolics/conformance.py` still writes 0.85 in its comparison, on purpose: that is the licence's
+number used as the check's own reference.
+
 ### 2026-11-20: a new test compared a float sum exactly, and Python 3.11 disagreed in the last bit
 
 **Attempted:** The second CI run (44836872430), after the two fixes below.

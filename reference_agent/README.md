@@ -2,7 +2,8 @@
 
 The honesty machinery of an AI agent, taken out of the agent it was built for so it can be used in another one.
 Each module moves one kind of honesty out of the model and into code that can be checked: the model can ask for
-anything, and these decide. Standard library only.
+anything, and these decide. Standard library only, plus one constant from this repository's core: the 0.85
+directive cap, imported from `symbolics.agency` so there is a single value to change (`tests/test_one_cap.py`).
 
 | Module | The failure it addresses | How |
 |---|---|---|
