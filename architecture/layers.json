@@ -4,7 +4,7 @@
   "stage": {
     "current": 1,
     "name": "Collaborative Foundation",
-    "meaning": "Public self-contained architecture skeleton with zero private dependencies."
+    "meaning": "Public, self-contained architecture skeleton that needs nothing from any private repository."
   },
   "layers": [
     {
@@ -70,13 +70,13 @@
         {
           "repo": "recursive-symbolics",
           "path": "examples/algebra_simplifier.py",
-          "what": "Zero-dependency symbolic algebra backend and RuleEngine.",
+          "what": "Standard-library symbolic algebra backend and RuleEngine.",
           "evidence": "tests/test_interfaces_and_examples.py"
         },
         {
           "repo": "recursive-symbolics",
           "path": "examples/propositional_reducer.py",
-          "what": "Zero-dependency propositional logic reducer with truth-table ground truth.",
+          "what": "Standard-library propositional logic reducer with truth-table ground truth.",
           "evidence": "tests/test_interfaces_and_examples.py"
         },
         {
@@ -104,6 +104,12 @@
           "path": "symbolics/conformance.py",
           "what": "Executable license duties (Articles 5.1(D), 6, 8, 9).",
           "evidence": "tests/conformance/test_conformance.py"
+        },
+        {
+          "repo": "recursive-symbolics",
+          "path": "reference_agent/outbound.py",
+          "what": "Approval gate: nothing an agent sends or changes outside the machine goes without a person's yes.",
+          "evidence": "tests/reference_agent_tests/test_mcp.py"
         },
         {
           "repo": "recursive-symbolics",
@@ -184,8 +190,15 @@
         },
         {
           "repo": "recursive-symbolics",
-          "path": "engines/athanor.py",
-          "what": "Transactional GGUF inspection and copy-on-write undo journal."
+          "path": "athanor/workshop.py",
+          "what": "Transactional GGUF inspection and copy-on-write undo journal (the athanor package).",
+          "evidence": "tests/athanor_tests/test_athanor.py"
+        },
+        {
+          "repo": "recursive-symbolics",
+          "path": "mcp-workspace/apis/workspace.go",
+          "what": "Workspace memory for agents: findings stored with the exact lines they rest on, re-checked on recall.",
+          "evidence": "mcp-workspace/apis/workspace_test.go"
         }
       ],
       "gaps": []
@@ -205,6 +218,28 @@
           "repo": "recursive-symbolics",
           "path": "tests/test_sanitization_audit.py",
           "what": "Automated PII, path, and broken-import verification suite."
+        },
+        {
+          "repo": "recursive-symbolics",
+          "path": "LIBER_0.md",
+          "what": "Append-only working record: what was tried, what happened, and the guard for each breach."
+        },
+        {
+          "repo": "recursive-symbolics",
+          "path": "symbolics/record.py",
+          "what": "Checks through git history that LIBER_0.md is only ever added to.",
+          "evidence": "tests/test_record_and_staleness.py"
+        },
+        {
+          "repo": "recursive-symbolics",
+          "path": "symbolics/breaches.py",
+          "what": "Checks that every FAILED or CORRECTED entry names an existing guard or a reason.",
+          "evidence": "tests/test_breaches.py"
+        },
+        {
+          "repo": "recursive-symbolics",
+          "path": "architecture/guards.json",
+          "what": "Guards and accepted edits recorded beside the record, never inside it."
         }
       ],
       "gaps": []

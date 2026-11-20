@@ -23,6 +23,13 @@ jobs:
       with:
         python-version: ${{ matrix.python-version }}
 
+    - name: Install NumPy for the two engine test modules
+      # The core uses only the standard library. tests/test_recursive_attractor_engine.py and
+      # tests/test_engine_composition_loop.py test engines that need NumPy; without it they are skipped, and CI
+      # should run them, not skip them.
+      run: |
+        python -m pip install "numpy>=1.24"
+
     - name: Run Quickstart Reference Demos
       run: |
         python examples/quickstart.py
@@ -35,6 +42,11 @@ jobs:
       run: |
         python -m symbolics.layers
 
+    - name: Run Append-Only Record & Breach Guard Checks
+      run: |
+        python -m symbolics.record
+        python -m symbolics.breaches
+
     - name: Run Outgoing Commit Leak Scanner
       run: |
         python -m symbolics.outgoing
@@ -42,3 +54,68 @@ jobs:
     - name: Run Full Unit & Mutation Test Suite
       run: |
         python -m unittest discover -s tests -v
+
+    - name: Run athanor's planted-bug check (all 13 must be caught; the symlink ones need Linux)
+      run: |
+        python tests/athanor_tests/breakit.py
+
+  workspace:
+    # The Go MCP server in mcp-workspace/: vet, test, build, then the Python gate's live tests against the binary.
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version-file: mcp-workspace/go.mod
+
+    - name: Vet, test and build the server
+      working-directory: mcp-workspace
+      run: |
+        go vet ./...
+        go test -count=1 ./...
+        go build -o agentbase .
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
+
+    - name: Run the approval gate's live tests against the built server
+      run: |
+        python -m unittest -v tests.reference_agent_tests.test_agentbase_mcp
+
+  corpus:
+    # The practice corpus needs NumPy and scikit-learn; the core above uses only the Python standard library.
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0    # the ledger staleness check reads real git history
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
+
+    - name: Install corpus dependencies
+      run: |
+        python -m pip install "numpy>=1.24" "scikit-learn>=1.3"
+
+    - name: Run the 24 engines
+      working-directory: corpus
+      run: |
+        python test_all_engines.py
+
+    - name: Run every correspondence ledger
+      working-directory: corpus
+      run: |
+        python run_all_correspondence_ledgers.py
+
+    - name: Run every corpus test file
+      working-directory: corpus
+      run: |
+        python run_corpus.py

@@ -1,0 +1,18 @@
+{
+  "about": "Guards for LIBER_0.md entries that cannot carry their own. Entries are never edited, so an entry written without a **Guard:** line gets its guard here, keyed by its heading exactly as written. New entries carry a **Guard:** line of their own instead. Checked by: python -m symbolics.breaches",
+  "guards": [
+    {
+      "entry": "2026-11-20: the intermittent test error named, its cause still unknown; and CI would have failed without NumPy",
+      "guards": [
+        ".github/workflows/ci.yml",
+        "tests/test_recursive_attractor_engine.py",
+        "tests/test_engine_composition_loop.py"
+      ],
+      "why": "The entry quoted a FAILED result line, so it counts as a breach, and it was written without a Guard line. The guard is for its fixed part: CI installs NumPy, and both engine test modules skip themselves without it. These are whole-file guards: they show the files exist, not that the skip works; that was checked by hand with NumPy blocked (skipped=2). The intermittent error in tests/test_outgoing.py has no guard yet, because its cause is unknown."
+    }
+  ],
+  "record_edits": {
+    "about": "In-place edits of LIBER_0.md (python -m symbolics.record). Entries are only ever added. Only the Maintainer edits or removes anything in the record, and only to remove what must not be kept; the Maintainer names each such commit here, beside the record, not inside it. A contributor or an agent never adds to this list.",
+    "accepted": []
+  }
+}

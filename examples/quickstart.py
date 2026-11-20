@@ -1,4 +1,4 @@
-"""Single zero-dependency entry point demonstrating Recursive Symbolics end-to-end.
+"""Single entry point (standard library only) demonstrating Recursive Symbolics end-to-end.
 
 Run:
     python examples/quickstart.py

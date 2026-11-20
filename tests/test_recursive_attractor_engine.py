@@ -30,8 +30,12 @@ this file ships with for the exact injected bugs and their results).
 import sys
 import math
 import unittest
-import numpy as np
 from pathlib import Path
+
+try:
+    import numpy as np
+except ImportError:  # the engine needs NumPy; the core does not. Reported as skipped, never as passed.
+    raise unittest.SkipTest("NumPy is not installed: engines/recursive_attractor_engine.py needs it")
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 _ENGINES = str(_REPO_ROOT / "engines")

@@ -1,3 +1,23 @@
 {
-  "equivalent_mutants": []
+  "about": "Mutants no test can kill because they do not change behaviour (equivalent mutants). Each is listed with the label symbolics.mutate prints, and with the reason it is equivalent, so a reader can disagree with the reason. A label names a line number: if the code moves, the label stops matching and the mutant is reported as a survivor again, which is the safe direction. Recorded 2026-11-20.",
+  "equivalent_mutants": [
+    "reference_agent/governance.py:134 (Add->Sub)",
+    "reference_agent/governance.py:135 (Gt->GtE)",
+    "reference_agent/mcp.py:148 (Gt->GtE)",
+    "athanor/codec.py:12 (Lt->LtE)",
+    "athanor/codec.py:63 (Lt->LtE)",
+    "athanor/codec.py:63 (Gt->GtE)",
+    "athanor/gguf.py:55 (NotEq->Eq)",
+    "athanor/workshop.py:53 (Eq->NotEq)"
+  ],
+  "why": {
+    "reference_agent/governance.py:134 (Add->Sub)": "log2(c / total + 1e-12) becomes log2(c / total - 1e-12). The 1e-12 only guards against log2(0), which cannot happen because every count is at least 1; the result moves by about 1e-12, and gamma() rounds to 4 decimal places.",
+    "reference_agent/governance.py:135 (Gt->GtE)": "len(counts) > 1 becomes >= 1. The only input that differs is one distinct word, where log2(1) is 0.0, the same as the else branch.",
+    "reference_agent/mcp.py:148 (Gt->GtE)": "time.monotonic() > deadline becomes >=. They differ only at the single instant the clock equals the deadline, which no test can hit on purpose and which changes nothing but whether one more line is read.",
+    "athanor/codec.py:12 (Lt->LtE)": "e < 2 becomes e <= 2. At e = 2 both branches give the same bits: 0x00200000 << 2 = 0x00800000, and (2 - 1) << 23 = 0x00800000.",
+    "athanor/codec.py:63 (Lt->LtE)": "factor < 0 becomes factor <= 0. factor == 0 returned earlier (codec.py:58), so this line never sees 0.",
+    "athanor/codec.py:63 (Gt->GtE)": "abs(k - round(k)) > 1e-12 becomes >= 1e-12. They differ only if log2 of a float lands exactly 1e-12 from an integer, which no real factor does.",
+    "athanor/gguf.py:55 (NotEq->Eq)": "et != 7 only keeps bool arrays off the fast path. The slow path reads the same values one at a time with the same struct format, so the result is the same either way.",
+    "athanor/workshop.py:53 (Eq->NotEq)": "(Was line 21 before the lock retry was added above it.) On Windows, os.name == 'nt' becomes != and the move uses os.replace instead of MoveFileExW with write-through. Both replace the file atomically; they differ only in durability across a power loss, which no test can observe. On Linux the mutant calls kernel32 and fails, so it is killed there (CI)."
+  }
 }

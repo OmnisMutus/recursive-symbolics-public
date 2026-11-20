@@ -7,6 +7,7 @@ Ground truth:
 4. Read-only original file never modified during mutation execution, plus comment/string immunity.
 """
 
+import ast
 import hashlib
 import stat
 import tempfile
@@ -70,6 +71,74 @@ class TestMutationGate(unittest.TestCase):
             self.assertEqual(res["total"], 1)
             self.assertEqual(res["killed"], 0)
             self.assertEqual(res["survivors"], ["weak_mod.py:2 (GtE->Gt)"])
+
+    def test_a_mutant_only_a_second_test_module_catches_is_killed_when_both_are_named(self):
+        # Added 2026-11-20, when a target could first name several test modules. Ground truth by construction:
+        # test_a never exercises the boundary, test_b does, so the one mutant survives test_a alone and dies
+        # when test_b runs too.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "two_mod.py").write_bytes(b"def is_adult(age: int) -> bool:\n    return age >= 18\n")
+            (root / "test_a.py").write_text(
+                "import unittest\nimport two_mod\nclass T(unittest.TestCase):\n"
+                "    def test_far(self):\n        self.assertTrue(two_mod.is_adult(40))\n",
+                encoding="utf-8", newline="\n")
+            (root / "test_b.py").write_text(
+                "import unittest\nimport two_mod\nclass T(unittest.TestCase):\n"
+                "    def test_edge(self):\n        self.assertTrue(two_mod.is_adult(18))\n",
+                encoding="utf-8", newline="\n")
+            alone = mutate.mutate_module("two_mod.py", "test_a", root=root)
+            both = mutate.mutate_module("two_mod.py", ("test_a", "test_b"), root=root)
+            self.assertEqual(alone["survivors"], ["two_mod.py:2 (GtE->Gt)"])
+            self.assertEqual((both["killed"], both["total"], both["survivors"]), (1, 1, []))
+            self.assertEqual(both["test_module"], "test_a test_b")
+            self.assertNotEqual(alone["test_sha256"], both["test_sha256"])
+
+    def _toy(self, root, src, test_body):
+        (root / "toy2.py").write_bytes(src.encode())
+        (root / "test_toy2.py").write_text(
+            "import unittest\nimport toy2\nclass T(unittest.TestCase):\n    def test_it(self):\n" + test_body,
+            encoding="utf-8", newline="\n")
+
+    def test_arithmetic_and_boolean_mutants_are_really_applied(self):
+        # Added 2026-11-20 (mutate.py:193, :195 survived): a mutant whose kind is never applied leaves the
+        # source unchanged, so it would be reported as a survivor. Each toy here has exactly one site, and the
+        # test kills it only if the swap really happened. Ground truth: 2 + 3 is 5; True and False is False.
+        for src, body, label in (
+                ("def f(a, b):\n    return a + b\n", "        self.assertEqual(toy2.f(2, 3), 5)\n", "Add->Sub"),
+                ("def f(a, b):\n    return a and b\n", "        self.assertFalse(toy2.f(True, False))\n", "And->Or")):
+            with tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp)
+                self._toy(root, src, body)
+                res = mutate.mutate_module("toy2.py", "test_toy2", root=root)
+                self.assertEqual((res["killed"], res["total"], res["survivors"]), (1, 1, []), label)
+
+    def test_limit_caps_the_mutants_at_exactly_that_number(self):
+        # mutate.py:95, len(mutants) >= limit. Three comparison sites; limit=2 must give 2, not 3.
+        tree = ast.parse("def f(a):\n    return a < 1 or a > 9 or a == 5\n")
+        self.assertEqual(len(mutate.collect_mutants(tree)), 4)           # one BoolOp and three comparisons
+        self.assertEqual(len(mutate.collect_mutants(tree, limit=2)), 2)
+        self.assertEqual(len(mutate.collect_mutants(tree, limit=1)), 1)
+
+    def test_main_exits_1_when_a_mutant_survives_and_0_when_all_die(self):
+        # mutate.py:304: CI relies on the exit code. A survivor alone (no errors) must still fail the run.
+        import contextlib
+        import io
+        from unittest import mock
+        for body, want in (("        self.assertTrue(toy2.f(25))\n", 1),
+                           ("        self.assertTrue(toy2.f(18))\n        self.assertFalse(toy2.f(17))\n", 0)):
+            with tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp)
+                self._toy(root, "def f(age):\n    return age >= 18\n", body)
+                with mock.patch.object(mutate, "REPO_ROOT", root), \
+                        mock.patch.object(mutate, "TARGETS", {"toy2.py": "test_toy2"}), \
+                        contextlib.redirect_stdout(io.StringIO()):
+                    self.assertEqual(mutate.main(["--module", "toy2.py"]), want, body)
+
+    def test_test_modules_must_be_named(self):
+        for bad in ((), [], ("",), ("ok", ""), None, 3):
+            with self.assertRaises((ValueError, TypeError)):
+                mutate._test_modules(bad)
 
     def test_baseline_failure_raises_before_mutation_and_preserves_bytes(self):
         with tempfile.TemporaryDirectory() as tmp:

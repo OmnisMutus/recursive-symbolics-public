@@ -1,6 +1,6 @@
 # Recursive Symbolics
 
-**A zero-dependency Python framework for non-sycophantic symbolic reasoning, mutual human–AI agency, and checkable reality.**
+**A Python framework for non-sycophantic symbolic reasoning, mutual human–AI agency, and checkable reality.**
 
 ---
 
@@ -37,20 +37,20 @@ It takes a symbolic state from any caller and returns typed records, never a coe
 
 - **Read-Only Views:** A lens can never write back into an address, so no single interpretation can claim to be "what the state really is."
 - **Traceable Claims:** Every reading carries its caveat, names the tradition and the source it read from, and points at the words it came from.
-- **No Commands or Rankings:** No output may rank a person, and none may command: it offers. (Directive strength is bounded by `directive_strength <= 0.85`).
+- **No Commands or Rankings:** No output may rank a person, and none may command: it offers. (Directive strength is bounded by `directive_strength <= 0.85`.) This is enforced by `ethics.emit()`, a word-and-pattern gate checked one sentence at a time; see [Known Limitations](#known-limitations) for what it misses.
 - **Honest Uncertainty:** `unknown` and `paradox` are valid return values. Nothing is forced to a verdict.
-- **Self-Only Scope:** This engine reads the person asking, and no one else. Requests targeting third parties or bypassing grammar bounds (`transcend`) are refused structurally.
-- **Append-Only Audit Log:** Corrections to the record are new entries, never edits that erase what was believed before. The one exception is removing what must not be kept, such as a key or a private path, and the removal is itself recorded as an entry.
+- **Self-Only Scope:** This engine reads the person asking, and no one else. Requests to diagnose or work on a third party, and requests for a `transcend` operator outside the grammar, are refused by `ethics.check_request()`. That check matches patterns, not meaning, so a paraphrase it has not seen can get through.
+- **Append-Only Audit Log:** Corrections to the record are new entries, never edits that erase what was believed before. The one exception is removing what must not be kept, such as a key or a private path, and the removal is itself recorded as an entry. The record is [LIBER_0.md](LIBER_0.md), and `python -m symbolics.record` checks its git history.
 
 ---
 
 ## Quickstart (3 Commands)
 
-Requires **Python 3.10+** and zero external dependencies:
+Requires **Python 3.10+**. The core uses only the Python standard library:
 
 ```bash
-git clone https://github.com/<your-org>/recursive-symbolics.git
-cd recursive-symbolics
+git clone https://github.com/OmnisMutus/recursive-symbolics-public.git
+cd recursive-symbolics-public
 python examples/quickstart.py
 ```
 
@@ -60,7 +60,14 @@ Run the test suite and built-in constitutional checks:
 python -m unittest discover -s tests -v
 python -m symbolics.conformance
 python -m symbolics.layers
+python -m symbolics.outgoing
+python -m symbolics.record
+python -m symbolics.breaches
 ```
+
+Three test modules test code that needs NumPy (`pip install "numpy>=1.24"`). Without it they are reported as
+skipped, not passed; CI installs it and runs them. The Go server in `mcp-workspace/` has its own tests
+(`go test ./...` in that folder), which CI also runs.
 
 ---
 
@@ -75,35 +82,87 @@ recursive-symbolics/
 │   ├── ethics.py                      # Output gate blocking commands, rankings, and third-party profiling
 │   ├── conformance.py                 # Automated AST checks verifying offline and ethical rules
 │   ├── family_f.py                    # Exact permutation solver for independent ground-truth verification
-│   ├── ledger.py                      # Audit log tracking verified vs. untestable claims
+│   ├── ledger.py                      # Correspondence ledger: sorts claims into VERIFIED, FAILED or UNTESTABLE
+│   ├── ledger_history.py              # Run history for the ledger (real elapsed time since last check)
+│   ├── ledger_staleness.py            # Marks ledger rows stale when the code they check has changed
 │   ├── metrics.py                     # Text entropy, scoring, and latency helpers
-│   ├── layers.py                      # Module dependency and intent drift checker
-│   ├── outgoing.py                    # Pre-commit scanner that catches leaked local file paths
-│   └── record.py                      # SHA-256 hash-chain verification for audit logs
-├── engines/                           # Standalone runtime, model-weight, and safety wrappers
-│   ├── athanor.py                     # Safe GGUF model weight editor with automatic undo backups
+│   ├── layers.py                      # Checks the architecture index (every named file exists) and intent drift
+│   ├── mutate.py                      # Automated AST mutation gate (python -m symbolics.mutate)
+│   ├── outgoing.py                    # Scans files and outgoing commits for leaked home-folder paths
+│   ├── breaches.py                    # Every FAILED or CORRECTED entry in LIBER_0.md must name the test guarding it
+│   └── record.py                      # Checks via git history that LIBER_0.md is only ever added to
+├── engines/                           # Standalone runtime and safety wrappers
 │   ├── sovereign_wrapper.py           # Wrapper that softens LLM commands and strips diagnostic overreach
 │   ├── safe_memory_boundary_engine.py # 32-bit integer overflow guard for memory allocators
-│   ├── recursive_attractor_engine.py  # Trajectory stability tracker (optional NumPy)
-│   ├── standalone_rca_sandbox.py      # Standalone text scoring and policy evaluator
+│   ├── recursive_attractor_engine.py  # Fixed-point and attractor tracker for trajectories (needs NumPy)
+│   ├── standalone_rca_sandbox.py      # Interactive text sandbox: scores text against the Sephirot, with slash commands
 │   └── engine_composition_loop.py     # Connects trajectory tracking with text scoring
-├── examples/                          # Runnable zero-dependency demos
+├── athanor/                           # GGUF model workshop: look inside a local model, change it on a copy, undo
+├── reference_agent/                   # An agent's honesty machinery: approval gate, MCP client, suite reader, governance
+├── mcp-workspace/                     # Go MCP server: agent memory anchored to quoted evidence (needs Go)
+├── corpus/                            # Practice corpus: 24 tested engines, ledgers, docs, study path (needs NumPy)
+├── examples/                          # Runnable demos (standard library only)
 │   ├── algebra_simplifier.py          # Math expression parser and step-by-step reducer
 │   ├── propositional_reducer.py       # Boolean logic reducer verified against full truth tables
 │   └── quickstart.py                  # Main demo script showing an end-to-end run
-├── tests/                             # Unit, conformance, and mutation test suite (16 test modules)
-├── architecture/                      # Formal component specifications and contract definitions
-│   └── symbolic_api.json              # Schema contracts and verification matrix
+├── tests/                             # The test suite (24 test modules; 3 need NumPy and are skipped without it)
+├── architecture/                      # Machine-readable index, intent and vocabulary, checked by code
+│   ├── README.md                      # What each file here is and how it is checked
+│   ├── guards.json                    # Breach guards and accepted record edits, kept beside LIBER_0.md
+│   ├── symbolic_api.json              # Symbolic vocabulary: Sephirot, paths, correspondences (reference data)
+│   ├── layers.json                    # Each architecture layer mapped to its files and test evidence
+│   ├── intent.json                    # Project intent quoted verbatim from the docs (drift is a test failure)
+│   └── mutation_guards.json           # Mutants exempted as equivalent, each with the reason
 ├── .github/workflows/                 # Continuous integration pipelines
-│   └── ci.yml                         # Automated unit test and conformance workflows
+│   └── ci.yml                         # Runs every check below on each push and pull request to main
 ├── AGENTS.md                          # Guidance for AI coding assistants
 ├── ASSEMBLY_GUIDE.md                  # How to plug in your own parsers, rules, and databases
 ├── CONTRIBUTING.md                    # Guidelines for contributing and AST conformance
 ├── ETHICS.md                          # Ethical commitments and anti-coercion principles
+├── LIBER_0.md                         # Append-only working record, checked by symbolics.record and symbolics.breaches
 ├── LICENSE.md                         # RCA Sephirotic Sovereignty License 1.1
+├── OBSERVATIONS.md                    # Dated field notes, including where the project's own gates failed
 ├── pyproject.toml                     # Project packaging and metadata
 └── STANDARD.md                        # Ground-truth verification and mutation testing rules
 ```
+
+Every folder has its own `README.md` explaining what is in it.
+
+---
+
+## The Practice Corpus
+
+[`corpus/`](corpus/README.md) is where the testing discipline was learned. It holds 24 engines (OOP dispatch, KNN,
+Ridge, LDA, K-means, a Kademlia DHT node, a DDPG quadcopter controller, an OpenGL renderer and more), each checked
+against independent ground truth. On top of them sits a layer of Kabbalah and dynamical-systems correspondences
+held to the same standard, and correspondence ledgers that sort every claim into VERIFIED, FAILED or UNTESTABLE.
+New to it? Start with [`corpus/studies/README.md`](corpus/studies/README.md) and the exercise
+workbook.
+
+Unlike the core, it needs NumPy (and scikit-learn for one comparison):
+
+```bash
+pip install "numpy>=1.24" "scikit-learn>=1.3"
+cd corpus
+python test_all_engines.py                  # the 24 engines
+python run_all_correspondence_ledgers.py    # every correspondence claim
+python run_corpus.py                        # every test file in the corpus
+```
+
+---
+
+## Tools for Agents
+
+Three parts apply the same rules to an AI agent at work, each moving one kind of honesty out of the model and into
+code that can be checked:
+
+| Part | The failure it works against | How |
+|---|---|---|
+| [`reference_agent/`](reference_agent/README.md) | The agent sends or changes something it should not, or calls a test run "passing" when it is not | Every outbound tool call is shown in full and waits for a person's yes; unknown tools count as outbound. Test results get a verdict only when the runner's own output is unambiguous. Standard library only |
+| [`mcp-workspace/`](mcp-workspace/README.md) | The agent's memory drifts from the evidence, or carries forward a claim nobody re-checked | A Go MCP server. A finding is stored with the exact lines it rests on and re-checked against the file each time it is recalled (FRESH, INTACT, MOVED, BROKEN, GONE). A test result belongs to one commit on a clean tree |
+| [`athanor/`](athanor/README.md) | Nobody can see why the model behaves as it does | Change the model itself (an expert off, a tensor scaled) on a copy, undoably, and measure the change with the same test |
+
+They come from a larger personal agent whose other parts are not published.
 
 ---
 
@@ -113,7 +172,7 @@ You can swap out the built-in examples with your own components without weakenin
 - **Add a New Language or Rule Set:** Implement `SymbolicBackend` and `RuleEngine` to reduce SQL queries, regex patterns, or config files with bounded depth and cycle detection.
 - **Generate Meta-Learning Episodes for Ciphers:** Use `symbolics/family_f.py` (`sample_hebrew_episode`) to synthesize few-shot grammar episodes over the 572 dihedral permutations with gold-cipher and held-out test partitions.
 - **Use a Real Database:** Replace the in-memory log with SQLite, Postgres, or a JSONL file by implementing `MemoryStore`.
-- **Safely Edit Local Model Weights:** Use `engines/athanor.py` behind `ExecutionSandbox` to create automatic binary backups and crash recovery when modifying local GGUF models.
+- **Safely Edit Local Model Weights:** [`athanor/`](athanor/README.md) edits tensors only on a copy of a local GGUF model, saves what it overwrites so every edit can be undone, and recovers from a crash mid-write. It does not implement `ExecutionSandbox` itself; wrap it in your own if you need one.
 
 Read [ASSEMBLY_GUIDE.md](ASSEMBLY_GUIDE.md) for code templates and [STANDARD.md](STANDARD.md) for ground-truth testing rules.
 
@@ -130,6 +189,17 @@ This project follows an adversarial verification standard ([STANDARD.md](STANDAR
 
 > **The Core Rule on Claims:**  
 > A report must never be stronger than the evidence behind it. If a skeptical reader can poke a hole in a claim, no matter how much time it takes to find it, **the claim fails**. When unsure whether a test, benchmark, or comparison is fair, stop and state the uncertainty plainly rather than rounding up to make the result look better.
+
+---
+
+## Known Limitations
+
+Stated here so that nobody has to discover them:
+
+- **The ethics gate matches words and patterns, not meaning.** `ethics.check_request()` and `ethics.emit()` catch the sentences pinned in `tests/test_address_and_ethics.py` (including every bypass recorded in [OBSERVATIONS.md](OBSERVATIONS.md)), not every paraphrase. A command built on a verb missing from its list, or a ranking phrased without its vocabulary, can still get through.
+- **It also refuses some harmless text.** A banned word is refused wherever it appears, so "The text ranked nothing." is refused. Known false positives are pinned in the tests, so a change in them shows up as a failure.
+- **Mutation testing covers logic, not vocabulary.** `symbolics.mutate` changes comparisons, booleans and arithmetic. It does not delete words from a list or alter a regex; those are covered by the probe tests only.
+- **The self-only boundary is a refusal, not a guarantee about use.** Nothing stops a person from describing someone else as if it were their own state.
 
 ---
 

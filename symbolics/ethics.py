@@ -27,11 +27,22 @@ CAVEAT = "This is a symbolic map; the territory is your lived experience."
 # violation the principle names, so the check is on the words that rank.
 JUDGMENT = ("optimal", "optimally", "suboptimal", "deficient", "deficiency", "better", "worse", "best", "worst",
             "efficient", "inefficient", "efficiency", "healthy state", "unhealthy", "advanced practitioner",
-            "regressed", "progress score", "ranked", "ranking", "grade", "scored higher", "scored lower")
+            "regressed", "progress score", "ranked", "ranking", "grade", "scored higher", "scored lower",
+            # added 2026-11-20 after the bypasses recorded in OBSERVATIONS.md
+            "rank", "ranks", "inferior", "superior", "below average", "above average", "percentile")
+# A placing among other people, written as a share: "the bottom 10%", "the top 5 % of people".
+_PLACING = re.compile(r"\b(?:top|bottom)\s+\d+(?:\.\d+)?\s*%", re.IGNORECASE)
 
-# core-ethics 2: tools "must output options, not commands".
-IMPERATIVE = re.compile(r"(?:^|(?<=[.!?]\s)|(?<=\n))\s*(?:you\s+(?:must|should|need\s+to|have\s+to)\b"
-                        r"|(?:do|stop|start|begin|perform|invoke|banish|meditate|fix|correct|avoid|cease)\b)",
+# core-ethics 2: tools "must output options, not commands". Checked one sentence at a time, so an offer in one
+# sentence does not excuse a command in the next ("Consider this: you must banish now. Stop everything.").
+_SENTENCES = re.compile(r"(?<=[.!?:;])\s+|\n+")
+# An obligation laid on the person is a command wherever it stands in the sentence, and no offer softens it.
+_OBLIGATION = re.compile(r"\byou\s+(?:must|should|need\s+to|have\s+to|ought\s+to)\b", re.IGNORECASE)
+# A sentence that opens with a bare verb. The list is finite, so a verb missing from it is a known gap.
+IMPERATIVE = re.compile(r"^\W*(?:then\s+)?(?:do|stop|start|begin|perform|invoke|banish|meditate|fix|correct|avoid|"
+                        r"cease|quit|leave|go|call|tell|text|break|end|cut|move|sell|buy|take|give|get|make|keep|"
+                        r"drop|walk|run|write|say|ask|confront|forgive|accept|trust|ignore|eat|sleep|pray|light|"
+                        r"burn|throw|delete|send|sign|pay|breathe|focus|let\s+go|wait|abandon|finish|repeat)\b",
                         re.IGNORECASE)
 OPTATIVE = ("you might", "you could", "some find", "one way", "if it helps", "you may wish", "consider")
 
@@ -44,7 +55,10 @@ _THIRD_PERSON = re.compile(r"\b(?:him|her|hers|his|them|their|theirs|he|she|they
 _RELATION = re.compile(r"\b(?:my|our|his|her|their)\s+(?:husband|wife|partner|boyfriend|girlfriend|ex|mother|"
                        r"father|mom|dad|sister|brother|son|daughter|friend|colleague|coworker|boss|neighbour|"
                        r"neighbor|roommate|client|patient|student|teacher)\b", re.IGNORECASE)
-_NAMED = re.compile(r"(?<![.!?]\s)(?<!^)\b[A-Z][a-z]{2,}(?:'s)?\b")          # a given name mid-sentence
+# A given name mid-sentence, counted only in the possessive ("Sarah's state"). Until 2026-11-20 any capitalised
+# word counted, which refused "interpret the Tower card" and "read Tarot for me": cards, Sephiroth and traditions
+# are capitalised too.
+_NAMED = re.compile(r"(?<![.!?]\s)(?<!^)\b[A-Z][a-z]{2,}'s\b")
 _RITUAL_FOR_OTHER = re.compile(r"\b(?:ritual|working|operation|sigil|spell|invocation)\b[^.?!]{0,30}?"
                                r"\b(?:for|on|against|to\s+(?:make|get|stop))\b", re.IGNORECASE)
 # A request framed about the person's own state stands, even when it names someone else.
@@ -53,8 +67,23 @@ _SELF = re.compile(r"\b(?:my\s+own\b|myself|my\s+(?:state|address|reading|practi
                    re.IGNORECASE)
 
 
+# A verb aimed straight at another person, or "what's wrong with" one. These are refused even inside a sentence
+# that also speaks of the asker's own state ("I feel my brother is depressed, diagnose him"): the self-framing
+# above excuses mentioning someone, not working on them. Added 2026-11-20 after OBSERVATIONS.md.
+# A capitalised word counts as a name only after "wrong with": after a verb it is too often a card, a Sephirah or
+# a tradition ("interpret the Tower", "read Tarot"), and refusing those would make the engine useless.
+_TARGET = (r"(?i:him|her|them|(?:my|our|his|her|their)\s+(?:husband|wife|partner|boyfriend|girlfriend|ex|mother|"
+           r"father|mom|dad|sister|brother|son|daughter|friend|colleague|coworker|boss|neighbour|neighbor|"
+           r"roommate|client|patient|student|teacher))\b")
+_AIMED = re.compile(r"(?i:\b(?:diagnose|analyse|analyze|assess|evaluate|judge|interpret|fix|heal|cure|influence|"
+                    r"persuade|convince|manipulate|bind|curse|compel|read))\s+" + _TARGET)
+_WRONG_WITH = re.compile(r"(?i:\bwrong\s+with)\s+(?:" + _TARGET + r"|[A-Z][a-z]{2,}\b)")
+
+
 def _about_another_person(text):
     """True when the request asks this engine to work on someone who is not the person asking."""
+    if _AIMED.search(text) or _WRONG_WITH.search(text):
+        return True
     if _SELF.search(text):
         return False
     target = _THIRD_PERSON.search(text) or _RELATION.search(text) or _NAMED.search(text)
@@ -106,13 +135,21 @@ def check_request(text):
 def judgment_words(text):
     """Which ranking words are in a piece of output (core-ethics 3). Empty is what output should be."""
     t = str(text or "").casefold()
-    return sorted({w for w in JUDGMENT if re.search(r"\b" + re.escape(w) + r"\b", t)})
+    found = {w for w in JUDGMENT if re.search(r"\b" + re.escape(w) + r"\b", t)}
+    found.update(" ".join(m.group(0).split()) for m in _PLACING.finditer(t))
+    return sorted(found)
 
 
 def is_directive(text):
-    """True when output tells the person what to do instead of offering (core-ethics 2)."""
-    t = str(text or "")
-    return bool(IMPERATIVE.search(t)) and not any(p in t.casefold() for p in OPTATIVE)
+    """True when output tells the person what to do instead of offering (core-ethics 2). Each sentence is judged
+    on its own: an obligation ("you must") is a command anywhere, and a sentence opening with a bare verb is a
+    command unless that same sentence offers it."""
+    for sentence in _SENTENCES.split(str(text or "")):
+        if _OBLIGATION.search(sentence):
+            return True
+        if IMPERATIVE.search(sentence) and not any(p in sentence.casefold() for p in OPTATIVE):
+            return True
+    return False
 
 
 def emit(value):

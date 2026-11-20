@@ -35,6 +35,8 @@ TARGETS: Dict[str, str] = {
     "symbolics/layers.py": "tests.test_layers",
     "symbolics/outgoing.py": "tests.test_outgoing",
     "symbolics/record.py": "tests.test_record_and_staleness",
+    "symbolics/breaches.py": "tests.test_breaches",
+    "symbolics/mutate.py": "tests.test_mutate",
     "symbolics/ledger_history.py": "tests.test_record_and_staleness",
     "symbolics/ledger_staleness.py": "tests.test_record_and_staleness",
     "engines/safe_memory_boundary_engine.py": "tests.test_safe_memory_boundary_engine",
@@ -42,7 +44,16 @@ TARGETS: Dict[str, str] = {
     "engines/recursive_attractor_engine.py": "tests.test_recursive_attractor_engine",
     "engines/engine_composition_loop.py": "tests.test_engine_composition_loop",
     "engines/standalone_rca_sandbox.py": "tests.test_standalone_rca_sandbox",
-    "engines/athanor.py": "tests.test_athanor",
+    "athanor/workshop.py": ("tests.athanor_tests.test_athanor", "tests.athanor_tests.test_review_regressions"),
+    "athanor/gguf.py": ("tests.athanor_tests.test_athanor", "tests.athanor_tests.test_review_regressions"),
+    "athanor/codec.py": ("tests.athanor_tests.test_athanor", "tests.athanor_tests.test_review_regressions"),
+    "athanor/edits.py": ("tests.athanor_tests.test_athanor", "tests.athanor_tests.test_review_regressions"),
+    "reference_agent/outbound.py": ("tests.reference_agent_tests.test_mcp",
+                                    "tests.reference_agent_tests.test_agentbase_mcp"),
+    "reference_agent/mcp.py": ("tests.reference_agent_tests.test_mcp",
+                               "tests.reference_agent_tests.test_agentbase_mcp"),
+    "reference_agent/suitecheck.py": "tests.reference_agent_tests.test_suitecheck",
+    "reference_agent/governance.py": "tests.reference_agent_tests.test_governance",
     "examples/algebra_simplifier.py": "tests.test_interfaces_and_examples",
     "examples/propositional_reducer.py": "tests.test_interfaces_and_examples",
 }
@@ -119,9 +130,18 @@ def _copy_workspace(src: Path, dst: Path) -> None:
     )
 
 
+def _test_modules(test_mod) -> List[str]:
+    """One test module name, or several (a tuple or list): a file tested from more than one place is mutated
+    against all of them, so a mutant counts as surviving only if no test anywhere catches it."""
+    mods = [test_mod] if isinstance(test_mod, str) else list(test_mod)
+    if not mods or not all(isinstance(m, str) and m for m in mods):
+        raise ValueError(f"test module(s) must be one or more non-empty names, got {test_mod!r}")
+    return mods
+
+
 def mutate_module(
     relpath: str,
-    test_mod: str,
+    test_mod,
     *,
     root: Path = REPO_ROOT,
     limit: int = 0,
@@ -129,6 +149,7 @@ def mutate_module(
     exemptions: Optional[set[str]] = None,
 ) -> dict:
     """Run automated AST mutation testing on an isolated temporary copy and return results + SHA-256 receipt."""
+    test_mods = _test_modules(test_mod)
     orig_path = root / relpath
     orig_bytes = orig_path.read_bytes()
     orig_text = orig_bytes.decode("utf-8")
@@ -150,7 +171,7 @@ def mutate_module(
         sandbox_file.chmod(0o644)
 
         baseline = subprocess.run(
-            [sys.executable, "-B", "-m", "unittest", test_mod],
+            [sys.executable, "-B", "-m", "unittest", *test_mods],
             cwd=str(sandbox_root),
             capture_output=True,
             text=True,
@@ -158,7 +179,7 @@ def mutate_module(
         )
         if baseline.returncode != 0:
             raise BaselineFailure(
-                f"Baseline tests failed for {test_mod} (rc={baseline.returncode}):\n"
+                f"Baseline tests failed for {' '.join(test_mods)} (rc={baseline.returncode}):\n"
                 f"{(baseline.stdout + baseline.stderr).strip()}"
             )
 
@@ -180,7 +201,7 @@ def mutate_module(
                 sandbox_file.write_text(mutated_src, encoding="utf-8", newline="\n")
                 try:
                     res = subprocess.run(
-                        [sys.executable, "-B", "-m", "unittest", test_mod, "--failfast"],
+                        [sys.executable, "-B", "-m", "unittest", *test_mods, "--failfast"],
                         cwd=str(sandbox_root),
                         capture_output=True,
                         text=True,
@@ -201,14 +222,18 @@ def mutate_module(
             finally:
                 sandbox_file.write_bytes(sandbox_orig_bytes)
 
-    test_path = _test_module_path(root, test_mod)
-    test_sha = _sha256_bytes(test_path.read_bytes()) if test_path else None
+    test_paths = [_test_module_path(root, m) for m in test_mods]
+    if all(test_paths):
+        test_sha = _sha256_bytes(b"".join(p.read_bytes() for p in test_paths))
+    else:
+        test_sha = None
+    test_label = test_mods[0] if len(test_mods) == 1 else " ".join(test_mods)
     mod_sha = _sha256_bytes(orig_bytes)
     receipt_payload = json.dumps(
         {
             "module": relpath,
             "module_sha256": mod_sha,
-            "test_module": test_mod,
+            "test_module": test_label,
             "test_sha256": test_sha,
             "killed": killed,
             "total": len(specs),
@@ -222,7 +247,7 @@ def mutate_module(
 
     return {
         "module": relpath,
-        "test_module": test_mod,
+        "test_module": test_label,
         "killed": killed,
         "total": len(specs),
         "survivors": survivors,

@@ -35,7 +35,7 @@ Every pull request that modifies or introduces code must adhere to [STANDARD.md]
 The core governance package (`symbolics/`) is offline-enforced and statically audited:
 
 - **Article 9 (Zero Network Access):** No module in `symbolics/` may import networking or socket libraries (`socket`, `http`, `urllib`, `requests`, `aiohttp`, etc.). This is verified via AST inspection in `python -m symbolics.conformance`.
-- **Zero Third-Party Dependencies:** `symbolics/` must run strictly on the Python standard library.
+- **Standard Library Only:** `symbolics/` must run strictly on the Python standard library.
 - **Article 6 (Agency Budget):** Directive strength must never exceed `GAMMA_MAX = 0.85`.
 - **Article 5.1(D) & Article 8:** Requests targeting or diagnosing third parties without consent are refused structurally, and symbolic coordinates (`Address`) may never be used to score, rank, or gate human beings.
 

@@ -643,10 +643,22 @@ class TestSephirahColorDisplay(unittest.TestCase):
             self.assertEqual(rca.colorize_sephirah(seph, seph, force_color=True), seph)
 
     def test_colorize_returns_plain_text_when_not_a_tty(self):
-        # Default force_color=False must defer to sys.stdout.isatty();
-        # this test suite's stdout is never a real terminal.
-        self.assertFalse(sys.stdout.isatty())
-        self.assertEqual(rca.colorize_sephirah("Tifereth", "Tifereth"), "Tifereth")
+        # Default force_color=False must defer to sys.stdout.isatty().
+        # Corrected 2026-11-20: this test used to assert that the suite's own
+        # stdout is never a terminal, which is false when the suite is run
+        # directly in a terminal. The test now supplies both kinds of stdout.
+        import io
+        from unittest import mock
+
+        class Terminal(io.StringIO):
+            def isatty(self):
+                return True
+
+        with mock.patch.object(rca.sys, "stdout", io.StringIO()):
+            self.assertEqual(rca.colorize_sephirah("Tifereth", "Tifereth"), "Tifereth")
+        with mock.patch.object(rca.sys, "stdout", Terminal()):
+            self.assertEqual(rca.colorize_sephirah("Tifereth", "Tifereth"),
+                             rca.colorize_sephirah("Tifereth", "Tifereth", force_color=True))
 
     def test_sephirah_planet_label_matches_codex_for_mapped_sephirah(self):
         self.assertEqual(rca.sephirah_planet_label("Tifereth"), " (Sun ☉)")

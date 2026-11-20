@@ -1,6 +1,6 @@
 # Assembly & Integration Guide
 
-This guide explains how to replace the zero-dependency reference implementations in `examples/` with domain-specific parsers, custom rewrite rules, persistent storage backends, or isolated execution engines while preserving the termination and epistemic contracts of `symbolics`.
+This guide explains how to replace the standard-library reference implementations in `examples/` with domain-specific parsers, custom rewrite rules, persistent storage backends, or isolated execution engines while preserving the termination and epistemic contracts of `symbolics`.
 
 ---
 
@@ -13,9 +13,9 @@ This guide explains how to replace the zero-dependency reference implementations
 | `SymbolicBackend` | `Protocol` | `parse()`, `format()`, `complexity()`, `evaluate()` | `examples/algebra_simplifier.AlgebraBackend` |
 | `RuleEngine` | `ABC` | `rewrite_once()` composed into bounded `reduce_to_fixed_point()` | `examples/propositional_reducer.PropositionalReducer` |
 | `MemoryStore` | `Protocol` | `get()`, `put()`, `snapshot()`, `verify_integrity()` | `symbolics.interfaces.InMemoryLedgerStore` |
-| `ExecutionSandbox` | `Protocol` | `verify_target()`, `checkpoint()`, `rollback()` | `engines.athanor` (GGUF vessel sandbox) |
+| `ExecutionSandbox` | `Protocol` | `verify_target()`, `checkpoint()`, `rollback()` | None in this repository. `athanor.workshop` provides the same pieces for GGUF models (`create`, `write`, `undo`) without implementing the protocol; see section 4.B |
 
-All protocols are `@runtime_checkable` and use zero external dependencies.
+All protocols are `@runtime_checkable` and use only the Python standard library.
 
 ---
 
@@ -70,7 +70,7 @@ To add a new symbolic domain (e.g., SQL query canonicalizer, lambda-calculus red
 `InMemoryLedgerStore` hashes every write as a SHA-256 chain (`index`, `prev_hash`, `key`, `value`, `reason`) in memory. To persist traces to SQLite, Postgres, or a JSONL append-only ledger:
 
 1. Implement `get(key, default=None)`, `put(key, value, reason="") -> str`, `snapshot() -> dict`, and `verify_integrity() -> bool`.
-2. Ensure `put()` computes hashes over **canonical JSON** (`json.dumps(..., sort_keys=True, default=str)`), links `prev_hash` to the prior record, and uses atomic temp-file replacement or transactions if backed by files (`engines/athanor.py::_replace_durable` demonstrates Windows + POSIX atomic durability).
+2. Ensure `put()` computes hashes over **canonical JSON** (`json.dumps(..., sort_keys=True, default=str)`), links `prev_hash` to the prior record, and uses atomic temp-file replacement or transactions if backed by files (`athanor/workshop.py::_replace_durable` demonstrates Windows + POSIX atomic durability).
 3. Ensure `verify_integrity()` re-computes every link from `GENESIS` (`"0" * 64`) rather than trusting stored hashes alone, returning `False` on any chain mismatch or payload edit.
 
 **Design Note: Structural Simplicity in State Commitments**  
@@ -87,10 +87,10 @@ We deliberately use standard-library SHA-256 hash chains rather than algebraic c
 - `"CONTRADICTED"`: Deterministic rule yields a different output than `proposed` (even if `approved=True`!).
 - `"UNCHECKED"`: Study pairs are ambiguous or outside Family-F.
 
-### B. Copy-on-Write Model/Weight Vessels (`engines/athanor.py`)
-When plugging local GGUF model inspection/mutation behind `ExecutionSandbox`:
-1. Never mutate live Ollama blobs directly (`is_ollama_blob` refuses it).
-2. Create an isolated vessel copy (`athanor.create(src, dest)`), which initializes `<vessel>.athanor/vessel.json`, `journal.jsonl`, and `undo/`.
+### B. Copy-on-Write Model/Weight Vessels (`athanor/`)
+When plugging local GGUF model inspection/mutation behind your own `ExecutionSandbox`:
+1. Never mutate live Ollama blobs directly (`athanor.workshop.is_ollama_blob` refuses it).
+2. Create an isolated vessel copy (`athanor.workshop.create(src, dest)`), which initializes `<vessel>.athanor/vessel.json`, `journal.jsonl`, and `undo/`.
 3. Every tensor write saves `<id>.bin` before mutation and writes a `pending.json` crash-recovery marker (`_recover` rolls back or completes interrupted writes).
 
 ### C. Sovereignty Output Wrapper (`engines/sovereign_wrapper.py`)

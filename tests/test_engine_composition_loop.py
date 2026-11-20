@@ -20,7 +20,10 @@ composed experiment's results turn out to mean.
 
 import unittest
 
-import numpy as np
+try:
+    import numpy as np
+except ImportError:  # the engines composed here need NumPy; the core does not. Reported as skipped, never passed.
+    raise unittest.SkipTest("NumPy is not installed: engines/engine_composition_loop.py needs it")
 
 import sys
 from pathlib import Path

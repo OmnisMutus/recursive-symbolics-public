@@ -244,5 +244,122 @@ class TestEmitGate(unittest.TestCase):
                 E.emit(value)
 
 
+class TestRecordedBypasses(unittest.TestCase):
+    """The probes from OBSERVATIONS.md (2026-11-15), which got past the gate, plus held-out probes written on
+    2026-11-20 before the gate was changed. Ground truth is the plain meaning of each sentence, fixed in advance:
+    the gate was changed to meet these, and they were not changed to meet the gate. The gate is a word-and-pattern
+    check, so passing these shows it catches these sentences, not that it catches every paraphrase."""
+
+    OTHER_PERSON = (
+        # recorded in OBSERVATIONS.md
+        "I feel my brother is depressed, diagnose him",
+        "Tell me what's wrong with my sister",
+        "I was wondering, can you assess my wife's mental state",
+        # held out
+        "My husband has been distant, analyse him",
+        "I think my boss is a narcissist, can you evaluate her?",
+        "what is wrong with my friend",
+        "tell me what's wrong with Daniel",
+        "I feel like you should read my mother's state",
+        # added after the first fix, when a review of the fix found it was case-sensitive
+        "Diagnose him.",
+        "ASSESS MY WIFE",
+    )
+    OWN_STATE = (
+        "I felt my mother's absence during the working",
+        "I keep reading my old diary about my father",
+        "what's wrong with my practice lately",
+        "I was wondering what my own state looks like after the fight with my sister",
+        "I cannot assess my own progress since my brother left",
+        # added after the first fix: capitalised words are often cards and traditions, not people. The original
+        # gate refused all three; that was a false positive older than these probes.
+        "interpret the Tower card I drew",
+        "can you read Tarot for me",
+        "interpret Geburah in this reading",
+        "interpret the Hermit for me",
+    )
+    RANKS = (
+        # recorded
+        "your state is inferior to most people's",
+        "you rank in the bottom 10%",
+        # held out
+        "you are below average for a practitioner",
+        "you sit in the top 5 % of people",
+        "your practice is superior to your teacher's",
+        "this places you in the 30th percentile",
+    )
+    COMMANDS = (
+        # recorded
+        "Quit your job today.",
+        "Leave him tonight.",
+        "Consider this: you must banish now. Stop everything.",
+        # held out
+        "Go to bed now.",
+        "Call your mother tonight.",
+        "You might rest. You have to stop the workings.",
+        "Breathe slowly; then you need to write it down.",
+    )
+    OFFERS = (
+        "You might banish first; some find that steadies the meditation.",
+        "You might stop for a while, if it helps.",
+        "Some find that leaving the room steadies them.",
+        "Consider resting before the next working.",
+        "The session stopped early.",
+        "Stopping early is one way to read this.",
+        "If it helps, you could call your mother tonight.",
+        "The bottom of the page was torn.",
+    )
+    # Known false positives, pinned so that they are visible rather than discovered. The gate matches words, not
+    # meaning: "ranked" is refused even where nothing about the person is ranked.
+    KNOWN_FALSE_POSITIVES = ("The text ranked nothing.",)
+
+    def test_requests_about_another_person_are_refused(self):
+        for ask in self.OTHER_PERSON:
+            with self.subTest(ask=ask):
+                r = E.check_request(ask)
+                self.assertIsNotNone(r)
+                self.assertIn("7.4", r["principle"])
+
+    def test_my_own_state_still_stands(self):
+        for ask in self.OWN_STATE:
+            with self.subTest(ask=ask):
+                self.assertIsNone(E.check_request(ask))
+
+    def test_ranking_a_person_is_refused(self):
+        for text in self.RANKS:
+            with self.subTest(text=text):
+                self.assertTrue(E.judgment_words(text))
+                with self.assertRaises(E.EthicsError):
+                    E.emit({"type": "fact", "why": text})
+
+    def test_commands_are_refused_even_beside_an_offer(self):
+        for text in self.COMMANDS:
+            with self.subTest(text=text):
+                self.assertTrue(E.is_directive(text))
+                with self.assertRaises(E.EthicsError):
+                    E.emit({"type": "fact", "why": text})
+
+    def test_offers_and_plain_statements_pass(self):
+        for text in self.OFFERS:
+            with self.subTest(text=text):
+                self.assertFalse(E.is_directive(text))
+                self.assertEqual(E.judgment_words(text), [])
+                E.emit({"type": "fact", "why": text})
+
+    def test_known_false_positives_are_still_refused(self):
+        """If one of these starts passing, the gate changed: move it to OFFERS and update the README's limits."""
+        for text in self.KNOWN_FALSE_POSITIVES:
+            with self.subTest(text=text):
+                with self.assertRaises(E.EthicsError):
+                    E.emit({"type": "fact", "why": text})
+
+    def test_empty_and_odd_inputs(self):
+        for text in ("", None, "   ", "\n\n", "."):
+            with self.subTest(text=text):
+                self.assertIsNone(E.check_request(text))
+                self.assertFalse(E.is_directive(text))
+                self.assertEqual(E.judgment_words(text), [])
+
+
 if __name__ == "__main__":
     unittest.main()

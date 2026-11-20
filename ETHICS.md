@@ -11,6 +11,10 @@ suite that could pass with nothing checked would be worse than no suite.
 
 ## The refusals
 
+The request and output checks below match words and patterns, not meaning. They catch the sentences pinned in
+`tests/test_address_and_ethics.py`, not every paraphrase; the README's Known Limitations section says what they
+miss.
+
 **This engine reads the person asking, and nobody else.** A request to diagnose, analyse, assess, fix, influence
 or work on another named person is refused (`ethics.check_request`). A state of your own that mentions another
 person is not refused, because a real diary is full of other people: "I was angry at my brother and cut the

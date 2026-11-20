@@ -7,13 +7,13 @@ and every commit that changed or deleted one is named by the Maintainer as accep
 
 The intent says: "Corrections to the record are new entries, never edits that erase what was believed before.
 The one exception is removing what must not be kept, such as a key or a private path, and the removal is itself
-recorded as an entry." On 2026-11-08, before anything checked this, six lines of older entries were reworded in
-place (commit fc60f51).
+recorded as an entry." A promise like that is easy to break quietly, by rewording an old entry in place, so it is
+checked here instead of trusted.
 
 Because the record is never edited, a historical edit cannot be excused by a line written inside it. It is named
 from the outside, in architecture/guards.json, under "record_edits":
 
-    "record_edits": {"accepted": [{"commit": "fc60f51", "why": "..."}]}
+    "record_edits": {"accepted": [{"commit": "<7 to 40 hex characters>", "why": "..."}]}
 
 An edit the history shows is accepted only when its commit is named there (7 to 40 hex characters, matched by
 prefix). Only the Maintainer names a commit there; an agent never adds to the list. Every other changed or deleted line,
