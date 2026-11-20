@@ -22,6 +22,13 @@ class FakeAgency:
     def cap(gamma):
         return min(gamma, FakeAgency.GAMMA_MAX)
 
+    @staticmethod
+    def sovereign(gamma_max=0.85, log=True):
+        """An honest enforcement path: whatever the answer was, what reaches the person offers."""
+        def decorate(fn):
+            return lambda: {"type": "fact", "content": "One option is to rest first."}
+        return decorate
+
 
 class LooseAgency(FakeAgency):
     GAMMA_MAX = 1.0
@@ -29,6 +36,31 @@ class LooseAgency(FakeAgency):
     @staticmethod
     def cap(gamma):
         return gamma
+
+
+class LeakyAgency(FakeAgency):
+    """Declares the right cap and clamps numbers correctly, but its enforcement path sends the command as it is.
+    The old check passed this; the effective-limit check must not."""
+
+    @staticmethod
+    def sovereign(gamma_max=0.85, log=True):
+        def decorate(fn):
+            return lambda: {"type": "fact", "content": fn()}
+        return decorate
+
+
+class LowerCapIgnored(FakeAgency):
+    """Enforces the default cap, but ignores a lower one: a reply at 0.6 passes a requested 0.5."""
+
+    @staticmethod
+    def directive_strength(text):
+        return 0.6 if "consider" in text.lower() else (0.9 if "must" in text.lower() else 0.2)
+
+    @staticmethod
+    def sovereign(gamma_max=0.85, log=True):
+        def decorate(fn):
+            return lambda: {"type": "fact", "content": "Consider doing it now."}
+        return decorate
 
 
 class TestChecks(unittest.TestCase):
@@ -119,6 +151,75 @@ class TestChecks(unittest.TestCase):
 
     def test_directivity_fails_when_the_cap_is_above_the_article(self):
         self.assertEqual(C.check_directivity(LooseAgency)["status"], C.FAIL)
+
+    def test_directivity_checks_what_actually_reaches_the_person(self):
+        """Added 2026-11-20 after an outside review: a clamp below 0.85 is not enough. An implementation that
+        sends the command unchanged, or ignores a lower cap, fails; one without an enforcement path is not
+        implemented."""
+        self.assertEqual(C.check_directivity(LeakyAgency)["status"], C.FAIL)
+        self.assertEqual(C.check_directivity(LowerCapIgnored)["status"], C.FAIL)
+
+        class NoEnforcement:
+            GAMMA_MAX = 0.85
+            directive_strength = staticmethod(FakeAgency.directive_strength)
+            cap = staticmethod(FakeAgency.cap)
+        self.assertEqual(C.check_directivity(NoEnforcement)["status"], C.NOT_IMPLEMENTED)
+
+    @staticmethod
+    def sending(reply, strength):
+        """A fake whose enforcement path sends `reply` at both caps, and whose measure gives it `strength`."""
+        class Fake(FakeAgency):
+            @staticmethod
+            def directive_strength(text):
+                return strength if text == reply else 0.9
+
+            @staticmethod
+            def sovereign(gamma_max=0.85, log=True):
+                return lambda fn: (lambda: reply if isinstance(reply, str) and reply.startswith("bare:")
+                                   else {"type": "fact", "content": reply})
+        return Fake
+
+    def test_a_reply_exactly_at_each_cap_is_allowed(self):
+        """conformance.py:111 and :112: the limit itself is inside it. A reply at exactly 0.5 passes both caps;
+        one at exactly 0.85 passes the default but not the lower one."""
+        self.assertEqual(C.check_directivity(self.sending("One option is to rest.", 0.5))["status"], C.PASS)
+        self.assertEqual(C.check_directivity(self.sending("One option is to rest.", 0.85))["status"], C.FAIL)
+
+        class AtEachCap(FakeAgency):
+            @staticmethod
+            def directive_strength(text):
+                return {"at default": 0.85, "at lower": 0.5}.get(text, 0.9)
+
+            @staticmethod
+            def sovereign(gamma_max=0.85, log=True):
+                text = "at lower" if gamma_max < 0.85 else "at default"
+                return lambda fn: (lambda: {"type": "fact", "content": text})
+        self.assertEqual(C.check_directivity(AtEachCap)["status"], C.PASS)
+
+    def test_a_bare_string_or_an_unreadable_record_is_not_withheld(self):
+        """conformance.py:108: only a refusal record counts as withheld. A bare string reaches the person as it is,
+        and a record with no text cannot be checked, so neither may pass as 'withheld' under the lower cap."""
+        self.assertEqual(C.check_directivity(self.sending("bare: you must go", 0.9))["status"], C.FAIL)
+
+        class NoText(FakeAgency):
+            @staticmethod
+            def sovereign(gamma_max=0.85, log=True):
+                return lambda fn: (lambda: {"type": "fact"})
+        self.assertEqual(C.check_directivity(NoText)["status"], C.FAIL)
+
+        class WithholdsBelowOnly(FakeAgency):
+            @staticmethod
+            def sovereign(gamma_max=0.85, log=True):
+                out = {"type": "refusal", "why": "withheld"} if gamma_max < 0.85 else {
+                    "type": "fact", "content": "One option is to rest."}
+                return lambda fn: (lambda: out)
+        self.assertEqual(C.check_directivity(WithholdsBelowOnly)["status"], C.PASS)
+
+    def test_the_real_agency_passes_the_effective_check_and_says_how(self):
+        from symbolics import agency
+        row = C.check_directivity(agency)
+        self.assertEqual(row["status"], C.PASS, row["detail"])
+        self.assertIn("what sovereign() let through, re-measured", row["detail"])
 
 
 class TestHonestyGuard(unittest.TestCase):

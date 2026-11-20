@@ -1,6 +1,8 @@
 {
   "about": "Mutants no test can kill because they do not change behaviour (equivalent mutants). Each is listed with the label symbolics.mutate prints, and with the reason it is equivalent, so a reader can disagree with the reason. A label names a line number: if the code moves, the label stops matching and the mutant is reported as a survivor again, which is the safe direction. Recorded 2026-11-20.",
   "equivalent_mutants": [
+    "symbolics/agency.py:93 (Gt->GtE)",
+    "symbolics/agency.py:94 (Gt->GtE)",
     "reference_agent/governance.py:135 (Add->Sub)",
     "reference_agent/governance.py:136 (Gt->GtE)",
     "reference_agent/mcp.py:148 (Gt->GtE)",
@@ -11,6 +13,8 @@
     "athanor/workshop.py:53 (Eq->NotEq)"
   ],
   "why": {
+    "symbolics/agency.py:93 (Gt->GtE)": "len(probs) > 1 becomes >= 1. They differ only with one distinct token (two or more copies of it): the original sets h_max = 1.0 and h is about -1.4e-12, so 1 - h_norm is 1; the mutant sets h_max = log2(1) = 0, line 94 then takes h_norm = 0.0, and 1 - 0 is 1. Both clamp to GAMMA_MAX.",
+    "symbolics/agency.py:94 (Gt->GtE)": "h_max > 0 becomes >= 0. In the original h_max is log2(n) for n > 1 or 1.0, never 0, so the comparison never sees 0 and both forms agree.",
     "reference_agent/governance.py:135 (Add->Sub)": "(Was line 134 before a docstring line was added.) log2(c / total + 1e-12) becomes log2(c / total - 1e-12). The 1e-12 only guards against log2(0), which cannot happen because every count is at least 1; the result moves by about 1e-12, and gamma() rounds to 4 decimal places.",
     "reference_agent/governance.py:136 (Gt->GtE)": "(Was line 135.) len(counts) > 1 becomes >= 1. The only input that differs is one distinct word, where log2(1) is 0.0, the same as the else branch.",
     "reference_agent/mcp.py:148 (Gt->GtE)": "time.monotonic() > deadline becomes >=. They differ only at the single instant the clock equals the deadline, which no test can hit on purpose and which changes nothing but whether one more line is read.",

@@ -42,6 +42,36 @@ or "none: <the reason no test can>". Required when the Result says FAILED or COR
 
 ## Entries
 
+### 2026-11-20: a lower cap was reported but not enforced, and Article 6's check only tested a clamp
+
+**Attempted:** Two further points from the same outside review.
+
+**Result:** CORRECTED, both.
+
+1. `agency.sovereign(gamma_max=0.5)` softened and added alternatives only at the global thresholds (0.70 and 0.40),
+   then labelled a reply above 0.5 `BREACHED` and returned it anyway; the comment beside it said this "cannot
+   happen", which was true only at the default cap. Now both thresholds come down to the requested cap, and a reply
+   still above it is withheld: the person gets a refusal saying so, and the reply is kept in
+   `sovereignty_metadata["withheld"]`, never returned as the answer. At the default cap nothing changes. Shown with
+   measured values: the imperative probe (0.600) was never softened under a 0.5 cap before; a repeated word that
+   stays at 0.561 after both steps is now withheld at 0.5 and sent at 0.6.
+2. `symbolics/conformance.py` checked Article 6 with `agency.cap(measured) <= 0.85`, which any clamp satisfies. It
+   now runs the probe through `sovereign()`, re-measures what would reach the person instead of trusting the
+   metadata, and checks it at the default cap and at 0.5. An implementation without `sovereign()` is NOT_IMPLEMENTED.
+   Writing the check exposed a hole in its first version: a bare string returned under the lower cap counted as
+   "withheld". Only a refusal record counts now.
+
+Mutation: `agency.py` 40 of 42 (2 equivalents in `entropy_gamma`, recorded with reasons, both older than this
+change), `conformance.py` 21 of 21. Full suite 574 tests OK on Python 3.14 and 3.11; the suite conforms, and now
+prints the effective limits (default 0.18, at 0.5 cap 0.3).
+
+**Guard:** tests/test_agency.py::test_a_reply_still_over_the_cap_is_withheld_not_returned, tests/test_agency.py::test_a_lower_cap_softens_what_the_default_would_let_through, tests/conformance/test_conformance.py::test_directivity_checks_what_actually_reaches_the_person, tests/conformance/test_conformance.py::test_a_bare_string_or_an_unreadable_record_is_not_withheld
+
+**Notes:** The review also asked for conformance to assert that the core and the reference agent agree on the cap.
+That check lives in `tests/test_one_cap.py` instead: `symbolics/` is the core and imports nothing from the packages
+built on it, and keeping it that way matters more than where the assertion sits. The test fails on the same
+condition the review described.
+
 ### 2026-11-20: the 0.85 cap had two definitions; now it has one, and a test keeps it that way
 
 **Attempted:** Close a drift path an outside review pointed at: rules written down in more than one place.

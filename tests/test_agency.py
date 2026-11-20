@@ -13,10 +13,12 @@ Ground truth, in the order TESTING_STANDARD.md asks for it:
 """
 import json
 import os
+import shutil
 import tempfile
 import unittest
 
 from symbolics import agency as A
+from symbolics import ethics as E
 
 FIXTURE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fixtures", "gamma_vectors.json")
 
@@ -250,6 +252,60 @@ class TestSovereignDecorator(unittest.TestCase):
         res_exact = fn_exact()
         self.assertEqual(res_exact["sovereignty_metadata"]["sovereignty_guarantee"],
                          "ALLOWABLE_AGENCY_BUDGET_RESPECTED")
+
+
+class TestALowerCapIsEnforced(unittest.TestCase):
+    """Added 2026-11-20 after an outside review: sovereign(gamma_max=...) used to label a reply above a lower cap
+    BREACHED and return it anyway, softening only at the global thresholds. Ground truth: the probe sentence and
+    the repeated word measure 0.600 and 0.850 (0.561 once the alternatives line is added), measured once and
+    written here; the expectations follow from the rule, not from the code under test."""
+
+    PROBE = "You must perform the banishing now. Do it before anything else. Stop everything."
+    LOOP = "om " * 80
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.tmp, True)
+
+    def answer(self, text, **kw):
+        @A.sovereign(log_dir=self.tmp, **kw)
+        def fn():
+            return text
+        return fn()
+
+    def test_a_lower_cap_softens_what_the_default_would_let_through(self):
+        self.assertAlmostEqual(A.directive_strength(self.PROBE), 0.600, places=3)
+        self.assertIn("You must", self.answer(self.PROBE)["content"])                 # 0.60 <= 0.70: not softened
+        lower = self.answer(self.PROBE, gamma_max=0.5)
+        self.assertNotIn("You must", lower["content"])                              # 0.60 > 0.50: softened
+        self.assertLessEqual(lower["sovereignty_metadata"]["directive_strength"], 0.5)
+
+    def test_a_lower_cap_lowers_the_alternatives_threshold(self):
+        # "om om a" measures 0.082: below the global 0.40, above a cap of 0.05, so alternatives are now offered.
+        self.assertNotIn(A.ALTERNATIVES_LINE, self.answer("om om a")["content"])
+        self.assertIn(A.ALTERNATIVES_LINE, self.answer("om om a", gamma_max=0.05)["content"])
+
+    def test_a_reply_still_over_the_cap_is_withheld_not_returned(self):
+        out = self.answer(self.LOOP, gamma_max=0.5)                                  # 0.561 > 0.5 after both steps
+        self.assertEqual(out["type"], "refusal")
+        self.assertNotIn("content", out)
+        meta = out["sovereignty_metadata"]
+        self.assertEqual(meta["sovereignty_guarantee"], "WITHHELD")
+        self.assertGreater(meta["directive_strength"], 0.5)
+        self.assertTrue(meta["withheld"].startswith(self.LOOP.strip()))              # kept, so nothing is hidden
+        self.assertIn("above the 0.5 it was asked to keep", out["why"])
+        self.assertIs(E.emit(out), out)                                             # a valid refusal for the gate
+
+    def test_the_cap_itself_is_allowed_and_the_default_never_withholds(self):
+        self.assertEqual(self.answer(self.LOOP, gamma_max=0.6)["type"], "fact")      # 0.561 <= 0.6
+        default = self.answer(self.LOOP)
+        self.assertEqual(default["type"], "fact")
+        self.assertEqual(default["sovereignty_metadata"]["sovereignty_guarantee"], "ALLOWABLE_AGENCY_BUDGET_RESPECTED")
+
+    def test_a_withheld_reply_is_still_audited(self):
+        self.answer(self.LOOP, gamma_max=0.5)
+        with open(os.path.join(self.tmp, "agency.jsonl"), encoding="utf-8") as fh:
+            self.assertEqual(len(fh.readlines()), 1)
 
 
 if __name__ == "__main__":

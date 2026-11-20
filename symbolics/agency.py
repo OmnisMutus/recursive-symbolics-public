@@ -208,6 +208,12 @@ def sovereign(gamma_max=GAMMA_MAX, min_alternatives=MIN_ALTERNATIVES, log=True, 
     the text is measured; if it pushes past SOFTEN_ABOVE it is softened and measured again; if gamma is above
     ALTERNATIVES_BELOW with fewer than min_alternatives offered, alternatives are appended (the Minimum
     Alternatives Rule); the payload is attached as sovereignty_metadata; and one audit line is written.
+
+    A lower gamma_max is enforced, not only reported (corrected 2026-11-20, after an outside review): both
+    thresholds come down to it, so a reply above the requested cap is softened and offered alternatives too, and
+    a reply still above it after both is withheld. The person then gets a refusal saying so; the reply is kept in
+    sovereignty_metadata["withheld"], never returned as the answer. At the default cap nothing changes:
+    measure() clamps at GAMMA_MAX, so nothing can exceed it.
     """
     if isinstance(gamma_max, bool) or not isinstance(gamma_max, (int, float)) or not (0 < gamma_max <= GAMMA_MAX):
         raise ValueError(f"gamma_max must be in (0, {GAMMA_MAX}], got {gamma_max!r}")
@@ -220,15 +226,25 @@ def sovereign(gamma_max=GAMMA_MAX, min_alternatives=MIN_ALTERNATIVES, log=True, 
             text = out.get(key) if key else (out if isinstance(out, str) else "")
             if not isinstance(text, str):
                 return out
-            if directive_strength(text) > SOFTEN_ABOVE:
+            soften_above = min(SOFTEN_ABOVE, gamma_max)          # read at call time, so tests may move them
+            alternatives_below = min(ALTERNATIVES_BELOW, gamma_max)
+            if directive_strength(text) > soften_above:
                 text = soften(text)
             data = measure(text)
-            if data["directive_strength"] > ALTERNATIVES_BELOW and data["alternatives_presented"] < min_alternatives:
+            if data["directive_strength"] > alternatives_below and data["alternatives_presented"] < min_alternatives:
                 text = text.rstrip() + "\n\n" + ALTERNATIVES_LINE
                 data = measure(text)
             data["max_gamma_cap"] = gamma_max
-            if data["directive_strength"] > gamma_max:                      # cannot happen while cap() holds
-                data["sovereignty_guarantee"] = "BREACHED"
+            if data["directive_strength"] > gamma_max:
+                data["sovereignty_guarantee"] = "WITHHELD"
+                data["withheld"] = text
+                if log:
+                    audit(data, log_dir or LOG_DIR)
+                return {"type": "refusal", "principle": "agency budget (licence Article 6)",
+                        "why": (f"This reply measured a directive strength of {data['directive_strength']} after "
+                                f"softening and offering alternatives, above the {gamma_max} it was asked to keep, "
+                                f"so it is withheld rather than sent."),
+                        "sovereignty_metadata": data}
             if log:
                 audit(data, log_dir or LOG_DIR)
             if as_dict:

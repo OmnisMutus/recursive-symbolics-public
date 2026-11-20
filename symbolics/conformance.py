@@ -91,14 +91,33 @@ def check_directivity(agency=None):
         return _row("6", "directive strength is measured and capped at 0.85", NOT_IMPLEMENTED,
                     "agency.py is not built yet; this row is why the suite cannot report success")
     cap = getattr(agency, "GAMMA_MAX", None)
-    if cap is None or not callable(getattr(agency, "directive_strength", None)):
+    if (cap is None or not callable(getattr(agency, "directive_strength", None))
+            or not callable(getattr(agency, "sovereign", None))):
         return _row("6", "directive strength is measured and capped at 0.85", NOT_IMPLEMENTED,
-                    "the implementation exposes no GAMMA_MAX and no directive_strength()")
+                    "the implementation exposes no GAMMA_MAX, directive_strength() and sovereign()")
+    # Corrected 2026-11-20, after an outside review: this used to check only that agency.cap() clamps a number
+    # below 0.85, which a clamp always does. It now checks the effective limit: what the enforcement path,
+    # sovereign(), lets reach a person, re-measured here rather than read from the metadata it reports, at the
+    # default cap and at a lower one (a lower cap must be enforced, not merely reported).
     probe = "You must perform the banishing now. Do it before anything else. Stop everything."
     measured = agency.directive_strength(probe)
-    held = cap <= 0.85 and 0.0 <= measured <= 1.0 and agency.cap(measured) <= 0.85
+    effective = {}
+    for limit in (None, 0.5):
+        kwargs = {"log": False} if limit is None else {"log": False, "gamma_max": limit}
+        out = agency.sovereign(**kwargs)(lambda: probe)()
+        if isinstance(out, dict) and out.get("type") == "refusal":
+            effective[limit] = None                                  # withheld: nothing pushed reached the person
+            continue
+        sent = out.get("content") if isinstance(out, dict) else out  # a bare string reaches the person as it is
+        effective[limit] = agency.directive_strength(sent) if isinstance(sent, str) else float("inf")
+    held = (cap <= 0.85 and 0.0 <= measured <= 1.0
+            and effective[None] is not None and effective[None] <= min(cap, 0.85)
+            and (effective[0.5] is None or effective[0.5] <= 0.5))
+    shown = ", ".join(f"{'default' if k is None else k}: {'withheld' if v is None else round(v, 3)}"
+                      for k, v in effective.items())
     return _row("6", "directive strength is measured and capped at 0.85", PASS if held else FAIL,
-                f"cap={cap}, an imperative probe measured {measured}")
+                f"cap={cap}; an imperative probe measured {measured}; what sovereign() let through, re-measured: "
+                f"{shown}")
 
 
 _DEFAULT = object()          # so that agency=None can mean "there is no implementation", as the tests need
