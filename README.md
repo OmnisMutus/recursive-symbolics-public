@@ -2,6 +2,8 @@
 
 **A Python framework for non-sycophantic symbolic reasoning, mutual human–AI agency, and checkable reality.**
 
+New here? [ELI5.md](ELI5.md) explains the whole repository in plain words.
+
 ---
 
 ## Why This Project Exists & The Specific Gap It Fills
@@ -118,6 +120,7 @@ recursive-symbolics/
 ├── AGENTS.md                          # Guidance for AI coding assistants
 ├── ASSEMBLY_GUIDE.md                  # How to plug in your own parsers, rules, and databases
 ├── CONTRIBUTING.md                    # Guidelines for contributing and AST conformance
+├── ELI5.md                            # The whole repository explained in plain words
 ├── ETHICS.md                          # Ethical commitments and anti-coercion principles
 ├── LIBER_0.md                         # Append-only working record, checked by symbolics.record and symbolics.breaches
 ├── LICENSE.md                         # RCA Sephirotic Sovereignty License 1.1

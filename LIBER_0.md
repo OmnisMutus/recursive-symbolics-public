@@ -42,6 +42,27 @@ or "none: <the reason no test can>". Required when the Result says FAILED or COR
 
 ## Entries
 
+### 2026-11-20: the first CI run, on a clean Linux runner, found two things this machine could not
+
+**Attempted:** Publish the repository and run CI for the first time (run 44834253000).
+
+**Result:** CORRECTED. The `corpus` job passed; `test` and `workspace` failed, each for a reason that only a clean
+machine or Linux could show:
+
+1. `tests/test_sanitization_audit.py` reported 11 unresolved imports: the corpus's optional scikit-learn and
+   PyTorch. This machine had both installed, so they always resolved here. They are now listed as optional extras
+   beside NumPy, as `pyproject.toml` already declares them.
+2. `mcp-workspace/apis/workspace_test.go`: `TestWS_SymlinkOutOfTheRootIsRefused` failed because the server refused
+   the symlink with "goes through a link (link.txt)", while the test expected "outside the project root". The
+   behaviour is right and stricter (every path component is checked for links before anything is resolved, as
+   the junction test already expects); the expectation predates that check. The test had only ever been skipped
+   here, because this Windows machine cannot create symlinks without extra rights.
+
+**Guard:** tests/test_sanitization_audit.py::test_all_python_files_parse_and_resolve_internal_imports, mcp-workspace/apis/workspace_test.go
+
+**Notes:** A test that is always skipped where it is written is not evidence; CI is the first place it runs. The
+athanor planted-bug check (two symlink cases) is the other example in this repository, and it runs in CI too.
+
 ### 2026-11-20: athanor retries a file Windows reports as held by another program
 
 **Attempted:** Fix the `WinError 32` failures seen twice in the athanor tests inside the mutation gate.

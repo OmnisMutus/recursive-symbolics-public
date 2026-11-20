@@ -297,7 +297,10 @@ func TestWS_SymlinkOutOfTheRootIsRefused(t *testing.T) {
 	if err := os.Symlink(filepath.Join(outsideDir, "s.txt"), filepath.Join(f.root, "link.txt")); err != nil {
 		t.Skipf("cannot create a symlink here: %v", err)
 	}
-	if _, err := f.s.doRecord("demo", "finding", "c", "link.txt", 1, 1, "secret", ""); err == nil || !strings.Contains(err.Error(), "outside the project root") {
+	// Corrected 2026-11-20: this expected "outside the project root", the message from before every path component
+	// was checked for links. The link check now refuses first, as it does for a junction below. The test had
+	// only ever been skipped (no symlink privilege on the Windows machine it was written on); Linux CI ran it.
+	if _, err := f.s.doRecord("demo", "finding", "c", "link.txt", 1, 1, "secret", ""); err == nil || !strings.Contains(err.Error(), "goes through a link (link.txt)") {
 		t.Fatalf("symlink out of the root: %v", err)
 	}
 }

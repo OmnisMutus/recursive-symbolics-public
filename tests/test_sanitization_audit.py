@@ -162,7 +162,10 @@ class TestSanitizationAudit(unittest.TestCase):
             sys.path.insert(0, ROOT)
         stdlib = getattr(sys, "stdlib_module_names", frozenset())
         local_roots = {"symbolics", "engines", "examples", "tests"}
-        optional_third_party = {"numpy"}
+        # Optional extras, named in pyproject.toml: NumPy for the engines and corpus, scikit-learn for the corpus's
+        # comparisons, PyTorch for one corpus benchmark that says so when it is absent. Found 2026-11-20 by the first
+        # CI run on a clean runner: this machine had all three installed, so their imports always resolved here.
+        optional_third_party = {"numpy", "sklearn", "torch"}
         unresolved = []
         # corpus/ runs its files with its own subfolders on sys.path (see corpus/run_all_correspondence_ledgers.py
         # and corpus/run_corpus.py), so a bare `import x` there resolves to any corpus/<sub>/x.py.
