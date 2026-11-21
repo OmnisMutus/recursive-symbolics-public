@@ -71,6 +71,15 @@ Three test modules test code that needs NumPy (`pip install "numpy>=1.24"`). Wit
 skipped, not passed; CI installs it and runs them. The Go server in `mcp-workspace/` has its own tests
 (`go test ./...` in that folder), which CI also runs.
 
+To use it as a library without cloning, install it straight from GitHub (it is not on PyPI). This installs the
+five packages (`symbolics`, `engines`, `examples`, `athanor`, `reference_agent`), not the tests or the corpus:
+
+```bash
+pip install git+https://github.com/OmnisMutus/recursive-symbolics-public
+```
+
+The engines and athanor's editing also need NumPy: `pip install "numpy>=1.24"`.
+
 ---
 
 ## Repository Structure
@@ -107,7 +116,7 @@ recursive-symbolics/
 │   ├── algebra_simplifier.py          # Math expression parser and step-by-step reducer
 │   ├── propositional_reducer.py       # Boolean logic reducer verified against full truth tables
 │   └── quickstart.py                  # Main demo script showing an end-to-end run
-├── tests/                             # The test suite (24 test modules; 3 need NumPy and are skipped without it)
+├── tests/                             # The test suite (25 test modules; 3 need NumPy and are skipped without it)
 ├── architecture/                      # Machine-readable index, intent and vocabulary, checked by code
 │   ├── README.md                      # What each file here is and how it is checked
 │   ├── guards.json                    # Breach guards and accepted record edits, kept beside LIBER_0.md
@@ -203,6 +212,11 @@ Stated here so that nobody has to discover them:
 - **It also refuses some harmless text.** A banned word is refused wherever it appears, so "The text ranked nothing." is refused. Known false positives are pinned in the tests, so a change in them shows up as a failure.
 - **Mutation testing covers logic, not vocabulary.** `symbolics.mutate` changes comparisons, booleans and arithmetic. It does not delete words from a list or alter a regex; those are covered by the probe tests only.
 - **The self-only boundary is a refusal, not a guarantee about use.** Nothing stops a person from describing someone else as if it were their own state.
+- **Directive strength is a proxy.** It measures word repetition and counted imperative forms, not insistence. A lower cap (`agency.sovereign(gamma_max=...)`) is enforced, and a reply still above it is withheld, but what is enforced is the proxy, not persuasion.
+- **The measurement is not tradition-neutral.** Lenses can be swapped, but `symbolics/metrics.py` builds an Address partly from Sephirot keyword scores, so the Kabbalistic vocabulary sits in the core, not only in one lens.
+- **There is no integrated agent.** The gate, the workspace server, athanor and the reference agent's parts are separate components with their own tests. Nothing here wires them into one running agent; `examples/quickstart.py` runs the core path end to end, not the agent tools.
+- **Some things exist twice and can drift.** The ledger framework is in `symbolics/` and in `corpus/ledgers/`, and `symbolic_api.json` in `architecture/` and `corpus/data/` (the two differ). The directive cap used to be one of these; it now has a single definition, checked by `tests/test_one_cap.py`.
+- **Interpreting a person's state is the core's purpose and its least checkable use.** The gate makes a reading arrive with its caveat, its source and its uncertainty; it cannot make the reading right.
 
 ---
 

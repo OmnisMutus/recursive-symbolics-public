@@ -23,7 +23,8 @@ docstring says what its ground truth is.
 | File | Tests |
 |---|---|
 | `test_address_and_ethics.py` | The address space, lenses and the ethics gate, as a decision table. `TestRecordedBypasses` pins every bypass recorded in `OBSERVATIONS.md`, plus known false positives. |
-| `test_agency.py` | The agency budget and its 0.85 cap. |
+| `test_agency.py` | The agency budget and its 0.85 cap, including that a lower cap is enforced: a reply still above it is withheld. |
+| `test_one_cap.py` | That the 0.85 cap is defined once, in `symbolics/agency.py`, and that every module using a cap holds that same value. |
 | `test_metrics.py` | The measurement layer. |
 | `test_interfaces_and_examples.py` | The abstract interfaces, and both example reducers. |
 | `test_family_f.py` | The D_22 permutation solver and its verification gate. |

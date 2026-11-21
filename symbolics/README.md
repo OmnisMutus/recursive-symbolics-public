@@ -30,7 +30,7 @@ or UNTESTABLE. The rest are the checks that keep the repository honest about its
 | `metrics.py` | The measurement layer: text in, observables out (entropy, centroid scores, latency helpers). Every address it builds says in its own derivation what the measurement cannot see. |
 | `address.py` | The address space: a three-axis point no tradition owns, and the read-only lenses that interpret one. |
 | `ethics.py` | The gate every reading passes through. `check_request()` refuses requests about a third party and the undefined `transcend` operator; `emit()` refuses a reading without its caveat, tradition, source or anchors, and any that ranks a person or commands. It matches words and patterns, not meaning: see Known Limitations in the main README. |
-| `agency.py` | The agency budget: directive strength (gamma) measured, capped at 0.85, disclosed and logged. |
+| `agency.py` | The agency budget: directive strength (gamma) measured, capped at 0.85, disclosed and logged. It holds the one definition of the cap (`GAMMA_MAX`). `sovereign()` is the enforcement path: it softens, adds alternatives, and under a lower `gamma_max` withholds a reply still above it. |
 | `interfaces.py` | The abstract contracts you implement to plug in your own parts: `SymbolicBackend`, `RuleEngine`, `MemoryStore`, `ExecutionSandbox`. See `ASSEMBLY_GUIDE.md`. |
 | `family_f.py` | An exact solver over the 572 dihedral (D_22) permutations, used as independent ground truth, and a generator of few-shot cipher episodes. |
 
@@ -48,7 +48,7 @@ Each runs as `python -m symbolics.<name>` and exits with an error when it fails.
 
 | File | What it checks |
 |---|---|
-| `conformance.py` | The licence's executable duties (Articles 5.1(D), 6, 8 and 9). This is the official Conformance Suite. |
+| `conformance.py` | The licence's executable duties (Articles 5.1(D), 6, 8 and 9). This is the official Conformance Suite. For Article 6 it re-measures what `sovereign()` actually lets reach a person, at the default cap and at a lower one. |
 | `layers.py` | That every file `architecture/layers.json` names exists, and that every sentence in `architecture/intent.json` still appears word for word in its source. |
 | `outgoing.py` | That no local home-folder path is about to be published, in the files or in any commit's patch or message. |
 | `record.py` | That `LIBER_0.md` is only ever added to, by reading its git history. |

@@ -64,6 +64,12 @@ Some sentences push ("Do this now."). Some leave room ("One option is..."). The 
 it **directive strength**, a number from 0 to 1. It is capped at **0.85**, so the system can suggest strongly but can
 never reach a pure command. When a reply gets close to the cap, alternatives are added.
 
+You can also ask for a *stricter* cap, say 0.5. Then a pushy reply is softened and given alternatives sooner, and if
+it is still too pushy after that, it is **held back**: you get a short note saying so, instead of the reply. The 0.85
+is written down in exactly one place, so it cannot quietly end up different in two parts of the code.
+
+The meter counts word patterns, not real pressure, so it is a rough guide, not a lie detector.
+
 Where: `symbolics/agency.py`.
 
 ---
