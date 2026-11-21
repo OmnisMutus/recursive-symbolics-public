@@ -1,6 +1,6 @@
 # AgentBase: AI-Native Backend & MCP Daemon Built on PocketBase
 
-> **In this repository** the server lives in `mcp-workspace/`, named for the part most people will use: the seven
+> **In this repository** the server lives in `mcp-workspace/`, named for the part most people will use: the eight
 > `ws_` tools that give an agent a memory tied to evidence (section 3, "The workspace"). The program itself is
 > still called `agentbase`: the binary, the Go module and the `AGENTBASE_*` environment variables keep that name.
 > Build it from this folder with `go build -o agentbase .` (add `.exe` on Windows). The approval gate that knows
@@ -82,31 +82,41 @@ flowchart TD
 ## 2. Project Directory Layout
 
 ```
-agentbase/
+mcp-workspace/                  # the Go module is named agentbase
 ├── apis/
-│   ├── mcp.go             # MCP server, the 11 ledger tools, HTTP/SSE mount + bearer auth
-│   ├── business.go        # setup_business, customer_schema, transact, query_ledger
-│   ├── policy.go          # Fail-closed policy parser, evaluator & balance-floor checks
-│   ├── hooks.go           # SSRF-hardened webhook validation & DialContext IP pinning
-│   ├── identity.go        # ed25519 agent key registration & signature verification
-│   ├── workspace.go       # Workspace: anchored findings, unknowns, notes, results, file summaries (local only)
-│   ├── workspace_mcp.go   # The 8 ws_ tools, registered only by EnableWorkspace
-│   ├── workspace_usage.go # ws_usage.jsonl: the bytes each workspace call costs, per session (sizes only)
-│   ├── link_windows.go    # Is a path component a link? Reads the Windows reparse tag
-│   ├── link_other.go      # The same check elsewhere: ModeSymlink
-│   ├── policy_test.go     # Policy parser/evaluator & bearer auth unit tests
-│   ├── ledger_test.go     # Ledger transaction, policy abort, hook & amount tests
-│   ├── e2e_test.go        # JSON-RPC MCP, HTTP guard, SSRF redirect, schema & ed25519 tests
-│   ├── nonce_test.go      # Signed-transfer replay protection and payload bytes
-│   ├── guards_test.go     # Tests added by the break-it pass (see STANDARD.md)
-│   └── workspace_test.go  # Workspace tests, ground truth from git and hand-built files
-├── main.go                # Entrypoint: stdio-mode branch + web/SSE serve
-├── go.mod                 # Module definition (pinned versions)
-├── go.sum                 # Resolved dependency checksums
-└── pb_data/               # Embedded SQLite database (generated at runtime)
+│   ├── README.md               # What each file in this folder holds
+│   ├── mcp.go                  # MCP server, the 11 ledger tools, HTTP/SSE mount + bearer auth
+│   ├── business.go             # setup_business, customer_schema, transact, query_ledger
+│   ├── policy.go               # Fail-closed policy parser, evaluator & balance-floor checks
+│   ├── hooks.go                # SSRF-hardened webhook validation & DialContext IP pinning
+│   ├── identity.go             # ed25519 agent key registration & signature verification
+│   ├── workspace.go            # Workspace: anchored findings, unknowns, notes, results, file summaries (local only)
+│   ├── workspace_mcp.go        # The 8 ws_ tools, registered only by EnableWorkspace
+│   ├── workspace_usage.go      # ws_usage.jsonl: the bytes each workspace call costs, per session (sizes only)
+│   ├── link_windows.go         # Is a path component a link? Reads the Windows reparse tag
+│   ├── link_other.go           # The same check elsewhere: ModeSymlink
+│   ├── policy_test.go          # Policy parser/evaluator & bearer auth unit tests
+│   ├── ledger_test.go          # Ledger transaction, policy abort, hook & amount tests
+│   ├── e2e_test.go             # JSON-RPC MCP, HTTP guard, SSRF redirect, schema & ed25519 tests
+│   ├── nonce_test.go           # Signed-transfer replay protection and payload bytes
+│   ├── guards_test.go          # Tests added by the break-it pass (see STANDARD.md)
+│   ├── workspace_test.go       # Workspace tests, ground truth from git and hand-built files
+│   ├── workspace_summary_test.go          # File summaries (FRESH/STALE), the brief, the 4000-byte note, the usage log
+│   ├── link_test_helpers_windows_test.go  # Test helper: the Windows name-surrogate (reparse tag) check
+│   └── link_test_helpers_other_test.go    # Test helper: the same check off Windows
+├── main.go                     # Entrypoint: --ws-usage, stdio --mcp branch, web/SSE serve
+├── go.mod                      # Module definition (pinned versions)
+├── go.sum                      # Resolved dependency checksums
+├── README.md                   # This file
+├── STANDARD.md                 # Which test guards each guard, and the mutation that broke it
+├── .gitignore                  # Keeps pb_data/ and the built binary out of git
+└── pb_data/                    # Embedded SQLite database (generated at runtime, git-ignored)
 ```
 
-Initialize the module and fetch dependencies:
+To build it here, `go.mod` and `go.sum` already pin everything: `go build -o agentbase .` (see section 4).
+
+How the module was first created, kept as a record (do not run these inside this repository: `go.mod` already
+exists, and `go mod init` would start a second module):
 
 ```bash
 mkdir agentbase && cd agentbase
@@ -147,8 +157,12 @@ tools (the 11 ledger tools and these 8), and the remote server offers 11.
 
 Add `--workspace-only` after `--mcp` for a session that only keeps its own work:
 the stdio server then offers the 8 `ws_` tools and nothing else. Every tool
-offered costs each session the tokens of its description; measured on this
-build, `tools/list` shrinks from 13,140 to 6,313 bytes of tool definitions.
+offered costs each session the tokens of its description. Measured on
+2026-11-21 (this build, Windows, `tools/list` over stdio, the `tools` array as
+compact JSON): 12,478 bytes for the 19 tools, 6,007 bytes for the 8 workspace
+tools alone, so `--workspace-only` roughly halves it. (An earlier figure,
+13,140 and 6,313 bytes, did not record how it was measured, and does not
+reproduce this way.)
 
 * `ws_brief` is where a session starts, in one call: the commit and whether the
   tree is clean, the last note and how many commits came after it, the open
