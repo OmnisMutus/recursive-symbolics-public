@@ -1,15 +1,45 @@
 [build-system]
-requires = ["setuptools>=68.0"]
+# 77 is the first setuptools that reads a PEP 639 licence expression and licence-files.
+requires = ["setuptools>=77.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "recursive-symbolics"
 version = "0.2.0"
-description = "Constitutional fixed-point symbolic computation framework; the core uses only the Python standard library."
+description = "A Python framework for non-sycophantic symbolic reasoning, mutual human-AI agency, and checkable reality; the core uses only the Python standard library."
 readme = "README.md"
 requires-python = ">=3.10"
-license = { file = "LICENSE.md" }
+# Not an OSI licence: source-available, free for non-commercial use (see LICENSE.md). PEP 639 names such a
+# licence with a LicenseRef- identifier; a "License ::" classifier may not be used alongside it.
+license = "LicenseRef-RCA-Sephirotic-Sovereignty-1.1"
+license-files = ["LICENSE.md"]
+authors = [{ name = "Recursive Symbolics Contributors" }]
+keywords = [
+    "ai-safety", "sycophancy", "ai-governance", "symbolic-reasoning", "kabbalah", "verification",
+    "mutation-testing", "append-only", "audit-log", "mcp",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Software Development :: Quality Assurance",
+    "Topic :: Software Development :: Testing",
+]
 dependencies = []
+
+[project.urls]
+Homepage = "https://github.com/OmnisMutus/recursive-symbolics-public"
+Repository = "https://github.com/OmnisMutus/recursive-symbolics-public"
+Issues = "https://github.com/OmnisMutus/recursive-symbolics-public/issues"
+Documentation = "https://github.com/OmnisMutus/recursive-symbolics-public/blob/main/ELI5.md"
 
 [project.optional-dependencies]
 engines = ["numpy>=1.24"]
