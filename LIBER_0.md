@@ -42,6 +42,21 @@ or "none: <the reason no test can>". Required when the Result says FAILED or COR
 
 ## Entries
 
+### 2026-11-21: release v0.3.0, so an install can name fixed code
+
+**Attempted:** Make the documented install reproducible. An outside evaluation pointed out that
+`pip install git+https://...` tracks `main`, so two installs can resolve to different code.
+
+**Result:** VERIFIED for the unpinned line before this change: run exactly as written in a clean virtual
+environment outside the repository, it cloned the repository, resolved to commit 7dbea54, built, installed the five
+packages and nothing else, and the installed copy passed the Conformance Suite (5 of 5) with the single cap. This
+entry adds a pinned form beside it, `@v0.3.0`, and the version moves from 0.2.0 (the number the very first public
+commit carried, though much has changed since) to 0.3.0. The tag `v0.3.0` names the commit that carries this entry.
+
+**Notes:** A tag can be moved or deleted by the repository's owner, so "always names the same code" holds while
+the tag is left alone; a full commit SHA is the stricter pin. Whether the pinned line installs exactly this commit is
+checked after the tag is pushed, not assumed.
+
 ### 2026-11-20: a lower cap was reported but not enforced, and Article 6's check only tested a clamp
 
 **Attempted:** Two further points from the same outside review.

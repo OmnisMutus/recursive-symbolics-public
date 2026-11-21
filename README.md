@@ -72,7 +72,17 @@ skipped, not passed; CI installs it and runs them. The Go server in `mcp-workspa
 (`go test ./...` in that folder), which CI also runs.
 
 To use it as a library without cloning, install it straight from GitHub (it is not on PyPI). This installs the
-five packages (`symbolics`, `engines`, `examples`, `athanor`, `reference_agent`), not the tests or the corpus:
+five packages (`symbolics`, `engines`, `examples`, `athanor`, `reference_agent`), not the tests or the corpus.
+
+For a reproducible install, pin a release tag. A release tag names one fixed commit and is not moved after release
+(for the strictest pin, use the full commit SHA in place of the tag):
+
+```bash
+pip install git+https://github.com/OmnisMutus/recursive-symbolics-public@v0.3.0
+```
+
+To follow the latest work instead, leave the tag off. That tracks `main`, so two installs on different days can
+get different code:
 
 ```bash
 pip install git+https://github.com/OmnisMutus/recursive-symbolics-public
