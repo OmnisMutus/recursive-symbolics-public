@@ -2,6 +2,19 @@
 
 **A Python framework for non-sycophantic symbolic reasoning, mutual human–AI agency, and checkable reality.**
 
+[![CI](https://github.com/OmnisMutus/recursive-symbolics-public/actions/workflows/ci.yml/badge.svg)](https://github.com/OmnisMutus/recursive-symbolics-public/actions/workflows/ci.yml)
+[![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/)
+[![License](https://img.shields.io/badge/license-RCA_Sovereignty_1.1-lightgrey.svg)](LICENSE.md)
+
+> **Status: alpha.** A working research framework, not a complete AI-safety solution.
+
+It is built to stop an AI system from silently turning:
+
+- uncertainty into a confident answer;
+- a preference into a command;
+- an interpretation into apparent reality;
+- "it ran" into "it is correct".
+
 New here? [ELI5.md](ELI5.md) explains the whole repository in plain words.
 
 ---
@@ -29,8 +42,8 @@ Data moves in one direction only, keeping raw measurements separate from interpr
                             ▼  [ONE-WAY BOUNDARY: Views cannot edit raw coordinates]
                          Lens (Domain-specific interpretation or tradition)
                             │
-                            ▼  [Constitutional Gate: Checks caveats, sources, & tone]
-                      Typed Reading (Observation + alternatives + audit trail)
+                            ▼  [Constitutional Gate: Checks caveats, sources, anchors, & tone]
+                      Typed Reading (reading + caveat + tradition + source + anchors)
 ```
 
 ### Core Guarantees
@@ -46,7 +59,7 @@ It takes a symbolic state from any caller and returns typed records, never a coe
 
 ---
 
-## Quickstart (3 Commands)
+## Quickstart
 
 Requires **Python 3.10+**. The core uses only the Python standard library:
 
@@ -70,6 +83,8 @@ python -m symbolics.breaches
 Three test modules test code that needs NumPy (`pip install "numpy>=1.24"`). Without it they are reported as
 skipped, not passed; CI installs it and runs them. The Go server in `mcp-workspace/` has its own tests
 (`go test ./...` in that folder), which CI also runs.
+
+### Installation
 
 To use it as a library without cloning, install it straight from GitHub (it is not on PyPI). This installs the
 five packages (`symbolics`, `engines`, `examples`, `athanor`, `reference_agent`), not the tests or the corpus.
@@ -96,6 +111,39 @@ pip install git+https://github.com/OmnisMutus/recursive-symbolics-public
 ```
 
 The engines and athanor's editing also need NumPy: `pip install "numpy>=1.24"`.
+
+### A minimal example
+
+A sentence about the asker's own state goes through the whole one-way path: measured into an Address, read by two
+traditions, passed through the gate. Then a request about someone else is refused.
+
+```python
+from symbolics import address, ethics, metrics
+
+text = "I kept rewriting the same paragraph and felt stuck."
+state = metrics.address_of(text, anchors=[address.Anchor("journal.md", text, (1, 1))])
+print("address:", state.point)
+
+for lens in ("kabbalistic", "dynamical"):
+    reading = ethics.emit(address.read(state, lens, caveat=ethics.CAVEAT))
+    print(f"{reading['tradition']}: reads {reading['reads']}")
+
+print("caveat:", reading["caveat"])
+print(ethics.check_request("Diagnose my coworker's mood for me.")["type"])
+```
+
+Output, from running exactly this against v0.3.0:
+
+```text
+address: (432, 293, 1000)
+Kabbalistic (Hermetic Tree of Life): reads Tiphareth
+dynamical systems: reads fixed point
+caveat: This is a symbolic map; the territory is your lived experience.
+refusal
+```
+
+The Address is the same whichever lens reads it. A reading without its caveat, tradition, source or anchor would
+be refused by `ethics.emit()` with an `EthicsError`. `python examples/quickstart.py` runs a longer walkthrough.
 
 ---
 
@@ -191,7 +239,29 @@ code that can be checked:
 | [`mcp-workspace/`](mcp-workspace/README.md) | The agent's memory drifts from the evidence, or carries forward a claim nobody re-checked | A Go MCP server. A finding is stored with the exact lines it rests on and re-checked against the file each time it is recalled (FRESH, INTACT, MOVED, BROKEN, GONE). A test result belongs to one commit on a clean tree |
 | [`athanor/`](athanor/README.md) | Nobody can see why the model behaves as it does | Change the model itself (an expert off, a tensor scaled) on a copy, undoably, and measure the change with the same test |
 
-They come from a larger personal agent whose other parts are not published.
+They come from a larger personal agent whose other parts are not published. They are separate components, each
+with its own tests; there is not yet one integrated agent runtime that wires them together.
+
+**Trying them:**
+
+```bash
+# athanor: inspect a local model (read only), make an undoable copy, switch one expert off, undo it
+python -m athanor inspect gpt-oss:20b
+python -m athanor vessel gpt-oss:20b gptoss
+python -m athanor bias gptoss 12 5 --off
+python -m athanor journal gptoss
+python -m athanor undo gptoss
+
+# mcp-workspace: build the Go server (agentbase.exe on Windows), then run it as a stdio MCP server
+# offering only the workspace tools
+cd mcp-workspace
+go build -o agentbase .
+./agentbase --mcp --workspace-only --dir=./pb_data
+```
+
+athanor never writes to Ollama's own files: it works on a copy it checked against Ollama's checksum, saves the old
+bytes before every change, and can undo any change exactly. The workspace server refuses to store a finding whose
+quoted words are not in the file it names. Each folder's README has the details.
 
 ---
 
@@ -216,6 +286,11 @@ This project follows an adversarial verification standard ([STANDARD.md](STANDAR
 - **`FAILED`**: A test exists and failed, or timed out.
 - **`MISSING`**: The file does not exist.
 
+Claims about meaning, rather than about code, are sorted by the correspondence ledger (`symbolics/ledger.py`) into
+**`VERIFIED`** (a real test backs it), **`FAILED`** (a real test contradicts it) and **`UNTESTABLE`**: no code can
+check it, by its nature, and that is declared rather than hidden. `UNTESTABLE` is not "evidence missing for now";
+a ledger whose every claim is `UNTESTABLE` refuses to report success.
+
 > **The Core Rule on Claims:**  
 > A report must never be stronger than the evidence behind it. If a skeptical reader can poke a hole in a claim, no matter how much time it takes to find it, **the claim fails**. When unsure whether a test, benchmark, or comparison is fair, stop and state the uncertainty plainly rather than rounding up to make the result look better.
 
@@ -235,9 +310,48 @@ Stated here so that nobody has to discover them:
 - **Some things exist twice and can drift.** The ledger framework is in `symbolics/` and in `corpus/ledgers/`, and `symbolic_api.json` in `architecture/` and `corpus/data/` (the two differ). The directive cap used to be one of these; it now has a single definition, checked by `tests/test_one_cap.py`.
 - **Interpreting a person's state is the core's purpose and its least checkable use.** The gate makes a reading arrive with its caveat, its source and its uncertainty; it cannot make the reading right.
 
+These are stated on purpose: the project prefers a named gap to a claim of completeness.
+
+---
+
+## Documentation
+
+| Read | For |
+|---|---|
+| [ELI5.md](ELI5.md) | the whole repository in plain words |
+| [ASSEMBLY_GUIDE.md](ASSEMBLY_GUIDE.md) | plugging in your own parsers, rules and stores |
+| [STANDARD.md](STANDARD.md) | what counts as VERIFIED, and the break-it rule |
+| [ETHICS.md](ETHICS.md) | what the engine refuses, and where each refusal lives in code |
+| [LIBER_0.md](LIBER_0.md) | the append-only record: what was tried, what failed, what guards it now |
+| [OBSERVATIONS.md](OBSERVATIONS.md) | dated field notes, including where the project's own gates failed |
+| [CONTRIBUTING.md](CONTRIBUTING.md) and [AGENTS.md](AGENTS.md) | the rules for changing anything |
+| [architecture/README.md](architecture/README.md) | the machine-checked description of the project |
+| any folder's `README.md` | what is in that folder |
+
+---
+
+## Contributing
+
+Read [CONTRIBUTING.md](CONTRIBUTING.md) before changing core behaviour. In short:
+
+- Run `python -m symbolics.conformance` after any edit in `symbolics/`, and the full test suite before pushing.
+- A module is VERIFIED only with an independent ground truth, edge cases, and the mutation gate
+  (`python -B -m symbolics.mutate --module <file>`) showing no unexplained survivors.
+- Some README sentences are quoted word for word in `architecture/intent.json`. To change one, change both in the
+  same commit; `python -m symbolics.layers` fails otherwise.
+- A file you add, move or rename that a layer depends on goes into `architecture/layers.json` in the same change.
+- A mistake is recorded as a new entry in `LIBER_0.md`, naming the test that now guards against it.
+
 ---
 
 ## License
 
 RCA Sephirotic Sovereignty License 1.1 (see [LICENSE.md](LICENSE.md)).  
-Source-available for non-commercial use. Under Article 0.7 of the License, `symbolics/conformance.py` (run via `python -m symbolics.conformance`) is designated as the official Conformance Suite, directly verifying key license rules (Articles 5.1(D), 6, 8, and 9).
+Source-available for non-commercial use; not an OSI-approved open-source licence. Under Article 0.7 of the License, `symbolics/conformance.py` (run via `python -m symbolics.conformance`) is designated as the official Conformance Suite, directly verifying key license rules (Articles 5.1(D), 6, 8, and 9).
+
+## Citation
+
+```text
+Recursive Symbolics Contributors. Recursive Symbolics, version 0.3.0.
+https://github.com/OmnisMutus/recursive-symbolics-public
+```
