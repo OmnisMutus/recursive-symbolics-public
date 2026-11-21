@@ -52,7 +52,16 @@ def main():
                 print(json.dumps({"jsonrpc": "2.0", "id": mid,
                                   "error": {"code": -32000, "message": "no such tool"}}), flush=True)
                 continue
-            out = {"content": [{"type": "text", "text": f"ok:{name}:{json.dumps(args, sort_keys=True)}"}]}
+            inbox = os.environ.get("STUB_INBOX")
+            if name == "get_new_messages" and inbox:
+                # vector-agent's queue: returned once, then emptied (crates/vector-agent/README.md)
+                with open(inbox, encoding="utf-8") as fh:
+                    queued = fh.read()
+                with open(inbox, "w", encoding="utf-8") as fh:
+                    fh.write("[]")
+                out = {"content": [{"type": "text", "text": queued}]}
+            else:
+                out = {"content": [{"type": "text", "text": f"ok:{name}:{json.dumps(args, sort_keys=True)}"}]}
         else:
             print(json.dumps({"jsonrpc": "2.0", "id": mid,
                               "error": {"code": -32601, "message": "unknown method"}}), flush=True)

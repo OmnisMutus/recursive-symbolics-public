@@ -53,6 +53,7 @@ TARGETS: Dict[str, str] = {
     "reference_agent/mcp.py": ("tests.reference_agent_tests.test_mcp",
                                "tests.reference_agent_tests.test_agentbase_mcp"),
     "reference_agent/suitecheck.py": "tests.reference_agent_tests.test_suitecheck",
+    "reference_agent/vector_bridge.py": "tests.reference_agent_tests.test_vector_bridge",
     "reference_agent/governance.py": "tests.reference_agent_tests.test_governance",
     "examples/algebra_simplifier.py": "tests.test_interfaces_and_examples",
     "examples/propositional_reducer.py": "tests.test_interfaces_and_examples",
