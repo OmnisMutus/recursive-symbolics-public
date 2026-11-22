@@ -120,6 +120,17 @@ class TestTheTransport(Base):
         self.assertTrue(out["text"].startswith("ok:my_npub"))
         self.assertFalse(out["is_error"])
 
+    def test_a_call_sends_its_arguments_exactly(self):
+        # mcp.py:184, `arguments or {}`. Added 2026-11-22: the first mutation gate run on Linux found that no test
+        # checked the arguments reach the server (on Windows the mutant timed out, which hid the gap). What the
+        # server received is read from the stub's own record, not from call()'s return value.
+        args = {"to_npub": "npub1example", "content": "hello"}
+        with self.server() as s:
+            s.call("send_dm", args)
+            s.call("my_npub")                      # no arguments at all: sent as {}
+        self.assertEqual(self.made(), [{"name": "send_dm", "arguments": args},
+                                       {"name": "my_npub", "arguments": {}}])
+
     def test_a_server_error_is_raised_not_returned_as_success(self):
         with self.server() as s:
             with self.assertRaises(mcp.MCPError) as caught:
