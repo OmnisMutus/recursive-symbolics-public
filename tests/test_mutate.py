@@ -113,8 +113,41 @@ class TestMutationGate(unittest.TestCase):
                 res = mutate.mutate_module("toy2.py", "test_toy2", root=root)
                 self.assertEqual((res["killed"], res["total"], res["survivors"]), (1, 1, []), label)
 
+    def test_every_operator_in_a_chained_comparison_is_mutated(self):
+        # Added 2026-11-22: chains such as 0 < x <= 1 were skipped, so bounds written that way went untested.
+        tree = ast.parse("def ok(x):\n    return 0 < x <= 1\n")
+        self.assertEqual([d for _, d, _, _ in mutate.collect_mutants(tree)], ["Lt->LtE", "LtE->Lt"])
+        # Ground truth by hand: ok(0) is False and ok(1) is True. Testing both ends kills both mutants;
+        # testing only the middle (0.5) kills neither.
+        for body, killed in (("        self.assertFalse(toy2.ok(0))\n        self.assertTrue(toy2.ok(1))\n", 2),
+                             ("        self.assertTrue(toy2.ok(0.5))\n", 0)):
+            with tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp)
+                self._toy(root, "def ok(x):\n    return 0 < x <= 1\n", body)
+                res = mutate.mutate_module("toy2.py", "test_toy2", root=root)
+                self.assertEqual((res["killed"], res["total"]), (killed, 2), body)
+
+    def test_the_same_swap_twice_on_one_line_gets_two_labels(self):
+        # Added 2026-11-22 (outside review): two `+` on one line shared one label, so an exemption was ambiguous.
+        tree = ast.parse("def f(a, b, c):\n    return a + b + c\n")
+        self.assertEqual([d for _, d, _, _ in mutate.collect_mutants(tree)], ["Add->Sub", "Add->Sub #2"])
+        tree = ast.parse("def ok(x):\n    return 0 <= x <= 1\n")
+        self.assertEqual([d for _, d, _, _ in mutate.collect_mutants(tree)], ["LtE->Lt", "LtE->Lt #2"])
+
+    def test_no_bytecode_is_written_even_by_a_child_process(self):
+        # Added 2026-11-22 (outside review): a child `python` without -B wrote .pyc files into the sandbox, and a
+        # later mutant of the same size could load the earlier one's code. The tests run with
+        # PYTHONDONTWRITEBYTECODE=1, which a child inherits; this toy's baseline fails if it is missing.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._toy(root, "def f(a):\n    return a == 1\n",
+                      "        import os\n        self.assertEqual(os.environ.get('PYTHONDONTWRITEBYTECODE'), '1')\n"
+                      "        self.assertTrue(toy2.f(1))\n")
+            res = mutate.mutate_module("toy2.py", "test_toy2", root=root)
+            self.assertEqual((res["killed"], res["total"]), (1, 1))
+
     def test_limit_caps_the_mutants_at_exactly_that_number(self):
-        # mutate.py:95, len(mutants) >= limit. Three comparison sites; limit=2 must give 2, not 3.
+        # The cap at the end of collect_mutants. Three comparison sites; limit=2 must give 2, not 3.
         tree = ast.parse("def f(a):\n    return a < 1 or a > 9 or a == 5\n")
         self.assertEqual(len(mutate.collect_mutants(tree)), 4)           # one BoolOp and three comparisons
         self.assertEqual(len(mutate.collect_mutants(tree, limit=2)), 2)

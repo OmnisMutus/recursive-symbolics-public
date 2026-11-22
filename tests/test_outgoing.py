@@ -163,6 +163,15 @@ class TestAgainstARealHistory(unittest.TestCase):
             self.assertEqual(res["commits"], 0)
             self.assertIn("Nothing is waiting to be pushed.", outgoing.report(res))
 
+    def test_a_failed_upstream_lookup_is_not_read_as_an_upstream(self):
+        # outgoing.py:91, code == 0 and upstream: added 2026-11-22 for the mutation gate. If git fails but prints
+        # something, that text is not a branch name, and the whole history is scanned instead.
+        from unittest import mock
+        with mock.patch.object(outgoing, "_git", return_value=(128, "fatal: no upstream configured")):
+            self.assertEqual(outgoing.outgoing_range("."), ("HEAD", "no upstream branch: the whole history"))
+        with mock.patch.object(outgoing, "_git", return_value=(0, "  \n")):
+            self.assertEqual(outgoing.outgoing_range(".")[0], "HEAD")
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

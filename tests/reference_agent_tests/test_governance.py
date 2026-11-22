@@ -104,8 +104,57 @@ class TestTheAgencyBudget(unittest.TestCase):
         self.assertEqual(G.gamma(""), 0.0)
 
     def test_a_review_flags_text_at_the_cap(self):
-        out = G.review("must")
+        # Until 2026-11-22 this used "must": one word sat at the cap only because gamma was the entropy half
+        # alone. With agency's single measure one word is SHORT_TEXT_GAMMA (0.45), and a real command is at the cap.
+        out = G.review("You must meditate every morning. It is the only way.")
         self.assertTrue(any(f["duty"] == "agency budget" for f in out["findings"]), out)
+
+    def test_review_and_agency_agree_on_the_same_words(self):
+        # the drift found while writing SIMPLE_API.md: review said 0.0 where agency said 0.85
+        from symbolics import agency
+        for text in ("You must meditate every morning. It is the only way.", "a a b",
+                     "You might sit with it, or you could try the opposite.", "breathe, breathe, breathe"):
+            self.assertEqual(G.review(text)["directive_strength"], round(agency.directive_strength(text), 4), text)
+
+    def test_zero_and_one_are_fractions_and_just_outside_is_not(self):
+        # governance.py:91, 0 <= value <= 1: both ends are allowed (found when chained comparisons began to be
+        # mutated, 2026-11-22). By hand: 0 x 0.5 / 1 is 0.0%, and 1 x 1 / 2 is 50.0%.
+        self.assertEqual(G.confidence(0, 0.5, 1), 0.0)
+        self.assertEqual(G.confidence(1, 1, 2), 50.0)
+        for bad in (-0.01, 1.01):
+            with self.assertRaises(G.GovernanceError):
+                G.confidence(bad, 0.5, 1)
+
+    def test_counts_are_whole_numbers(self):
+        # Outside review, 2026-11-22: confidence(0.5, 0.5, True) and (..., 1.9) were both read as 1 alternative
+        for bad in (True, 1.9, 2.0, "2"):
+            with self.assertRaises(G.GovernanceError, msg=repr(bad)):
+                G.confidence(0.5, 0.5, bad)
+            with self.assertRaises(G.GovernanceError, msg=repr(bad)):
+                G.rank(formally_defined=True, independent_practitioners=bad)
+        self.assertEqual(G.confidence(0.5, 0.5, 2), 12.5)           # by hand: 0.25 / 2 = 12.5%
+        self.assertEqual(G.rank(formally_defined=True, independent_practitioners=None)["inputs"]
+                         ["independent_practitioners"], 0)
+
+    def test_the_spellings_metrics_uses_are_symbols_too(self):
+        # Outside review, 2026-11-22: metrics.py spells Keter and Tifereth; governance knew only Kether and Tiphareth
+        self.assertEqual(G.is_ontological("Balance is Tifereth. Origin is Keter."), ["is Tifereth", "is Keter"])
+
+    def test_a_hedge_excuses_only_its_own_sentence(self):
+        # Outside review, 2026-11-22: the "lens" of a camera, a sentence earlier, excused the claim
+        self.assertEqual(G.is_ontological("I wiped my camera lens. Anger is Geburah."), ["is Geburah"])
+        self.assertEqual(G.is_ontological("Anger is Geburah. That reads as one reading."), ["is Geburah"])
+        self.assertEqual(G.is_ontological("Under the Kabbalistic lens, anger is Geburah."), [])
+        self.assertEqual(G.is_ontological("Anger is Geburah, on this map."), [])
+
+    def test_a_hedge_is_a_whole_word(self):
+        self.assertEqual(G.is_ontological("Anger is Geburah, says the lensmaker."), ["is Geburah"])
+
+    def test_true_is_not_a_fraction(self):
+        for name in ("evidence_quality", "pattern_coherence"):
+            kw = {"evidence_quality": 0.5, "pattern_coherence": 0.5, "alternatives": 2, name: True}
+            with self.assertRaises(G.GovernanceError):
+                G.confidence(**kw)
 
 
 class TestReviewingProse(unittest.TestCase):

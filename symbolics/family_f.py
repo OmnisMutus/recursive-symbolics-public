@@ -540,10 +540,11 @@ def solve_tzeruf(
         if normalized is None:
             return {"error": "Each study entry must be [input, output] or {'input': ..., 'output': ...} with non-empty text."}
         parsed_study = normalized
-        if text or (a is not None and b is not None):
-            extra_study, text_queries = _parse_tzeruf_text(text, a, b)
-            parsed_study.extend(extra_study)
-            parsed_queries.extend(text_queries)
+        # Anything also given as text, or as a and b, is added. _parse_tzeruf_text returns nothing when there is
+        # nothing to add, so no condition is needed here (one was, until 2026-11-22, and it changed nothing).
+        extra_study, text_queries = _parse_tzeruf_text(text, a, b)
+        parsed_study.extend(extra_study)
+        parsed_queries.extend(text_queries)
     else:
         parsed_study, parsed_queries = _parse_tzeruf_text(text, a, b)
 

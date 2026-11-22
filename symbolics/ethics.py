@@ -20,6 +20,7 @@ And the two deliberate omissions of hidden-axioms 7.4, which are refusals rather
 The refusals are the only place this engine is allowed to be directive.
 """
 import re
+from collections.abc import Mapping
 
 CAVEAT = "This is a symbolic map; the territory is your lived experience."
 
@@ -45,6 +46,9 @@ IMPERATIVE = re.compile(r"^\W*(?:then\s+)?(?:do|stop|start|begin|perform|invoke|
                         r"burn|throw|delete|send|sign|pay|breathe|focus|let\s+go|wait|abandon|finish|repeat)\b",
                         re.IGNORECASE)
 OPTATIVE = ("you might", "you could", "some find", "one way", "if it helps", "you may wish", "consider")
+# Whole words only (fixed 2026-11-22): as a substring, "consider" matched inside "considering", so "Stop now,
+# considering the cost." read as an offer.
+_OPTATIVE = re.compile(r"\b(?:" + "|".join(re.escape(p) for p in OPTATIVE) + r")\b", re.IGNORECASE)
 
 # hidden-axioms 7.4: the engine is for self-diagnosis and self-regulation. What is refused is a request to read,
 # judge or act on ANOTHER person; a state of your own that mentions someone else is not that, and must not be
@@ -147,9 +151,29 @@ def is_directive(text):
     for sentence in _SENTENCES.split(str(text or "")):
         if _OBLIGATION.search(sentence):
             return True
-        if IMPERATIVE.search(sentence) and not any(p in sentence.casefold() for p in OPTATIVE):
+        if IMPERATIVE.search(sentence) and not _OPTATIVE.search(sentence):
             return True
     return False
+
+
+def _own_words(value, in_anchors=False):
+    """Every string this engine wrote in a record, at any depth.
+
+    One kind of string is left out: the "quote" of an anchor, which is the person's own words, kept as evidence and
+    not this engine's to judge. Everything else in an anchor (its source, say) is checked, and a key that only
+    happens to be called "anchors" without holding anchors hides nothing. (2026-11-22: first only top-level strings
+    were checked; then any key named "anchors" or "type" was skipped at any depth. An outside review found that second gap.)
+    """
+    if isinstance(value, str):
+        yield value
+    elif isinstance(value, Mapping):
+        for key, item in value.items():
+            if in_anchors and key == "quote":
+                continue
+            yield from _own_words(item, in_anchors=(key == "anchors"))
+    elif isinstance(value, (list, tuple, set, frozenset)):
+        for item in value:
+            yield from _own_words(item, in_anchors)
 
 
 def emit(value):
@@ -161,7 +185,10 @@ def emit(value):
     kind = value["type"]
     if kind not in ("fact", "address", "reading", "paradox", "unknown", "refusal"):
         raise EthicsError(f"'{kind}' is not one of the six returnable types.")
-    text = " ".join(str(v) for k, v in value.items() if isinstance(v, str) and k != "type")
+    # Each string is its own line, so one field cannot run into the next and hide a command at the start of a
+    # sentence ("next step" + "Stop everything" read as one sentence; fixed 2026-11-22, found in an outside review). The
+    # top-level "type" is left out: it was checked above against the six kinds.
+    text = "\n".join(_own_words({k: v for k, v in value.items() if k != "type"}))
     bad = judgment_words(text)
     if bad:
         raise EthicsError(f"Non-Judgment (core-ethics 3): this output ranks the person: {', '.join(bad)}.")

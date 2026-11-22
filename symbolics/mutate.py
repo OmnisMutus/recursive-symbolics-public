@@ -14,6 +14,7 @@ import ast
 import copy
 import hashlib
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -54,6 +55,7 @@ TARGETS: Dict[str, str] = {
                                "tests.reference_agent_tests.test_agentbase_mcp"),
     "reference_agent/suitecheck.py": "tests.reference_agent_tests.test_suitecheck",
     "reference_agent/vector_bridge.py": "tests.reference_agent_tests.test_vector_bridge",
+    "symbolics/reading.py": "tests.test_reading",
     "reference_agent/governance.py": "tests.reference_agent_tests.test_governance",
     "examples/algebra_simplifier.py": "tests.test_interfaces_and_examples",
     "examples/propositional_reducer.py": "tests.test_interfaces_and_examples",
@@ -93,22 +95,34 @@ def collect_mutants(tree: ast.Module, limit: int = 0) -> List[Tuple[int, str, as
     """Collect AST mutation sites in traversal order. limit=0 means uncapped."""
     mutants: List[Tuple[int, str, ast.AST, str]] = []
     for node in ast.walk(tree):
-        if limit > 0 and len(mutants) >= limit:
-            break
         lineno = getattr(node, "lineno", 0)
-        if isinstance(node, ast.Compare) and len(node.ops) == 1:
-            op_type = type(node.ops[0])
-            if op_type in CMP_SWAPS:
-                if isinstance(node.left, ast.Name) and node.left.id == "__name__":
+        if isinstance(node, ast.Compare):
+            if isinstance(node.left, ast.Name) and node.left.id == "__name__":
+                continue
+            # Every operator of a chain is its own mutant (fixed 2026-11-22: chains such as 0 < x <= cap were
+            # skipped, so a bound written that way was never tested).
+            for i, op in enumerate(node.ops):
+                op_type = type(op)
+                if op_type not in CMP_SWAPS:
                     continue
-                mutants.append((lineno, f"{op_type.__name__}->{CMP_SWAPS[op_type].__name__}", node, "cmp"))
+                mutants.append((lineno, f"{op_type.__name__}->{CMP_SWAPS[op_type].__name__}", node, f"cmp:{i}"))
         elif isinstance(node, ast.BinOp) and type(node.op) in BIN_SWAPS:
             op_type = type(node.op)
             mutants.append((lineno, f"{op_type.__name__}->{BIN_SWAPS[op_type].__name__}", node, "bin"))
         elif isinstance(node, ast.BoolOp):
             new_op = ast.Or if isinstance(node.op, ast.And) else ast.And
             mutants.append((lineno, f"{type(node.op).__name__}->{new_op.__name__}", node, "boolop"))
-    return mutants
+    # Two mutants with the same line and the same swap would share one label, so an exemption could not say which
+    # it meant. The first keeps the plain label (so recorded exemptions still match); a later one gets " #2",
+    # " #3", in the order the tree is walked. Added 2026-11-22, after an outside review.
+    labelled = []
+    count: Dict[Tuple[int, str], int] = {}
+    for lineno, desc, node, kind in mutants:
+        count[(lineno, desc)] = count.get((lineno, desc), 0) + 1
+        n = count[(lineno, desc)]
+        labelled.append((lineno, desc if n == 1 else f"{desc} #{n}", node, kind))
+    # The cap is applied once, at the end: the same first `limit` sites, with one comparison to test.
+    return labelled[:limit] if limit > 0 else labelled
 
 
 def load_exemptions(root: Path) -> set[str]:
@@ -170,13 +184,19 @@ def mutate_module(
         sandbox_file = sandbox_root / relpath
         # Ensure writable inside temp sandbox even if original file is read-only.
         sandbox_file.chmod(0o644)
+        # No .pyc anywhere in the sandbox, child processes included (fixed 2026-11-22, found in an outside review). -B covers
+        # only the first process; a test that starts `python` without -B wrote a .pyc, and a .pyc is trusted when
+        # the source has the same size and the same mtime second. A one-character swap keeps the size, so the next
+        # mutant could run the previous mutant's code: false survivors and false kills both.
+        no_bytecode = {**os.environ, "PYTHONDONTWRITEBYTECODE": "1"}
 
         baseline = subprocess.run(
             [sys.executable, "-B", "-m", "unittest", *test_mods],
             cwd=str(sandbox_root),
             capture_output=True,
-            text=True,
+            encoding="utf-8", errors="replace",     # test output can hold Hebrew; the Windows codepage cannot
             timeout=max(timeout, 15),
+            env=no_bytecode,
         )
         if baseline.returncode != 0:
             raise BaselineFailure(
@@ -189,8 +209,9 @@ def mutate_module(
             m_tree = copy.deepcopy(tree)
             m_specs = collect_mutants(m_tree, limit=limit)
             lineno, desc, target_node, kind = m_specs[idx]
-            if kind == "cmp":
-                target_node.ops[0] = CMP_SWAPS[type(target_node.ops[0])]()
+            if kind.startswith("cmp:"):
+                i = int(kind.split(":", 1)[1])
+                target_node.ops[i] = CMP_SWAPS[type(target_node.ops[i])]()
             elif kind == "bin":
                 target_node.op = BIN_SWAPS[type(target_node.op)]()
             elif kind == "boolop":
@@ -205,8 +226,9 @@ def mutate_module(
                         [sys.executable, "-B", "-m", "unittest", *test_mods, "--failfast"],
                         cwd=str(sandbox_root),
                         capture_output=True,
-                        text=True,
+                        encoding="utf-8", errors="replace",
                         timeout=timeout,
+                        env=no_bytecode,
                     )
                     if res.returncode == 0:
                         if label in exempt:

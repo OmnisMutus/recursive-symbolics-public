@@ -243,6 +243,60 @@ class TestEmitGate(unittest.TestCase):
             with self.assertRaises(E.EthicsError):
                 E.emit(value)
 
+    # 2026-11-22, found while writing SIMPLE_API.md: emit read top-level strings only.
+    def test_a_ranking_nested_anywhere_is_refused(self):
+        for value in ({"type": "fact", "items": ["You are worse than others."]},
+                      {"type": "fact", "detail": {"note": "a superior practitioner"}},
+                      {"type": "fact", "rows": [{"cells": ("fine", "the best one")}]}):
+            with self.assertRaises(E.EthicsError, msg=repr(value)):
+                E.emit(value)
+
+    def test_a_command_nested_anywhere_is_refused(self):
+        with self.assertRaises(E.EthicsError):
+            E.emit({"type": "fact", "steps": ["You must banish first."]})
+
+    def test_the_persons_own_quoted_words_are_not_judged(self):
+        # anchors hold the person's words as evidence: "worse" and "Stop" there are theirs, not the engine's
+        r = {"type": "fact", "why": "this is what was read",
+             "anchors": [{"source": "journal.md", "quote": "I felt worse. Stop overthinking, I told myself."}]}
+        self.assertIs(E.emit(r), r)
+
+    def test_non_string_values_are_not_text(self):
+        E.emit({"type": "fact", "why": "a count", "n": 3, "ok": True, "none": None, "nums": [1, 2.5]})
+
+    # 2026-11-22, outside review: two bypasses left by the first nested fix, reproduced before fixing.
+    def test_a_field_cannot_run_into_the_next_and_hide_a_command(self):
+        # "next step" + "Stop everything" were joined into one sentence, so "Stop" was not at a sentence start
+        with self.assertRaises(E.EthicsError):
+            E.emit({"type": "fact", "label": "next step", "steps": ["Stop everything", "Delete the file"]})
+
+    def test_a_key_named_anchors_hides_nothing_unless_it_holds_anchors(self):
+        with self.assertRaises(E.EthicsError):
+            E.emit({"type": "fact", "detail": {"anchors": "You are worse than everyone. You must obey."}})
+        with self.assertRaises(E.EthicsError):          # an anchor's source is the engine's words, so it is read
+            E.emit({"type": "fact", "anchors": [{"source": "the worst note", "quote": "fine"}]})
+        with self.assertRaises(E.EthicsError):          # a nested "type" is only a field like any other
+            E.emit({"type": "fact", "detail": {"type": "You are worse than others."}})
+
+    def test_quotes_nested_inside_an_address_are_still_the_persons_words(self):
+        # a reading carries anchors twice: at the top and inside "address"
+        quote = {"source": "journal.md", "quote": "I felt worse. Stop overthinking."}
+        E.emit({"type": "fact", "anchors": [quote], "address": {"type": "address", "anchors": [quote]}})
+
+    def test_other_containers_are_read_too(self):
+        import types
+        for value in ({"type": "fact", "m": types.MappingProxyType({"note": "the best one"})},
+                      {"type": "fact", "s": {"the best one"}}):
+            with self.assertRaises(E.EthicsError, msg=repr(value)):
+                E.emit(value)
+
+    # 2026-11-22: a hedge counted inside a longer word, so "considering" excused a command.
+    def test_a_hedge_must_be_a_whole_word(self):
+        self.assertTrue(E.is_directive("Stop now, considering the cost."))
+        self.assertTrue(E.is_directive("Go, one wayward step at a time."))
+        self.assertFalse(E.is_directive("Stop now, or consider resting first."))
+        self.assertFalse(E.is_directive("Breathe, if it helps."))
+
 
 class TestRecordedBypasses(unittest.TestCase):
     """The probes from OBSERVATIONS.md (2026-11-15), which got past the gate, plus held-out probes written on

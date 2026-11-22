@@ -213,5 +213,53 @@ class TestPublicIndex(unittest.TestCase):
         json.dumps(layers.check())  # the result is plain data
 
 
+class TestReportAndExitCode(unittest.TestCase):
+    """Added 2026-11-22: the first whole run of the mutation gate found report() and main() untested line by line
+    (layers.py:147, 154, 155, 160, 169). Ground truth is the expected text, written out by hand."""
+
+    def result(self, checked=2, broken=(), ok=True):
+        return {"layers": [{"layer": "L1", "role": "core", "status": "COVERED", "gaps": ["no tool yet"],
+                            "components": [
+                                {"repo": layers.THIS_REPO, "path": "a.py", "status": "PRESENT", "detail": ""},
+                                {"repo": "other", "path": "b.py", "status": "MISSING", "detail": "not found: b.py"}]}],
+                "checked": checked, "broken": list(broken), "ok": ok}
+
+    def intent(self, state="RATIFIED", ok=True, drifted=()):
+        return {"state": state, "statements": 3, "drifted": list(drifted), "ok": ok}
+
+    def test_a_component_here_has_no_repo_prefix_and_one_elsewhere_does(self):
+        text = layers.report(self.result(), self.intent())
+        self.assertIn("      PRESENT   a.py", text)
+        self.assertIn("      MISSING   other: b.py   <- not found: b.py", text)
+        self.assertIn("      gap       no tool yet", text)
+
+    def test_broken_layers_are_named(self):
+        text = layers.report(self.result(broken=["L1", "L2"], ok=False), self.intent())
+        self.assertIn("  BROKEN: L1, L2", text)
+        self.assertNotIn("BROKEN", layers.report(self.result(), self.intent()))
+
+    def test_nothing_checked_is_said_and_one_checked_is_not(self):
+        self.assertIn("Nothing could be checked", layers.report(self.result(checked=0), self.intent()))
+        self.assertNotIn("Nothing could be checked", layers.report(self.result(checked=1), self.intent()))
+
+    def test_only_a_draft_says_not_ratified(self):
+        self.assertIn("Not ratified.", layers.report(self.result(), self.intent(state="DRAFT")))
+        self.assertNotIn("Not ratified.", layers.report(self.result(), self.intent(state="RATIFIED")))
+
+    def test_drift_is_shown(self):
+        text = layers.report(self.result(), self.intent(drifted=[{"source": "README.md", "text": "x", "why": "gone"}]))
+        self.assertIn('  DRIFTED  README.md: "x"  (gone)', text)
+
+    def test_main_exits_0_only_when_both_are_ok(self):
+        import contextlib
+        import io
+        from unittest import mock
+        for index_ok, intent_ok, code in ((True, True, 0), (True, False, 1), (False, True, 1), (False, False, 1)):
+            with mock.patch.object(layers, "check", return_value=self.result(ok=index_ok)), \
+                    mock.patch.object(layers, "check_intent", return_value=self.intent(ok=intent_ok)), \
+                    contextlib.redirect_stdout(io.StringIO()):
+                self.assertEqual(layers.main(), code, (index_ok, intent_ok))
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

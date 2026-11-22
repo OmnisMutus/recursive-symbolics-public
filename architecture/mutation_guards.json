@@ -2,10 +2,9 @@
   "about": "Mutants no test can kill because they do not change behaviour (equivalent mutants). Each is listed with the label symbolics.mutate prints, and with the reason it is equivalent, so a reader can disagree with the reason. A label names a line number: if the code moves, the label stops matching and the mutant is reported as a survivor again, which is the safe direction. Recorded 2026-11-20.",
   "equivalent_mutants": [
     "symbolics/metrics.py:124 (Gt->GtE)",
+    "symbolics/family_f.py:200 (Or->And)",
     "symbolics/agency.py:93 (Gt->GtE)",
     "symbolics/agency.py:94 (Gt->GtE)",
-    "reference_agent/governance.py:135 (Add->Sub)",
-    "reference_agent/governance.py:136 (Gt->GtE)",
     "reference_agent/mcp.py:148 (Gt->GtE)",
     "athanor/codec.py:12 (Lt->LtE)",
     "athanor/codec.py:63 (Lt->LtE)",
@@ -15,10 +14,9 @@
   ],
   "why": {
     "symbolics/metrics.py:124 (Gt->GtE)": "In entropy(), len(probs) > 1 becomes >= 1. They differ only with one distinct token repeated, where log2(1) is 0.0, the same value as the else branch, so h_max is 0.0 either way.",
+    "symbolics/family_f.py:200 (Or->And)": "In matching_rules(), `not nx or not ny` becomes `and`. Recorded 2026-11-22. When only one side of a study pair is empty, the mutant goes on instead of returning [] at once, but it still returns []: no rule applies to empty text (apply gives None, never equal to a word), and no rule turns a word into empty text (it gives None or a word, never ''). So no rule is consistent with that pair either way.",
     "symbolics/agency.py:93 (Gt->GtE)": "len(probs) > 1 becomes >= 1. They differ only with one distinct token (two or more copies of it): the original sets h_max = 1.0 and h is about -1.4e-12, so 1 - h_norm is 1; the mutant sets h_max = log2(1) = 0, line 94 then takes h_norm = 0.0, and 1 - 0 is 1. Both clamp to GAMMA_MAX.",
     "symbolics/agency.py:94 (Gt->GtE)": "h_max > 0 becomes >= 0. In the original h_max is log2(n) for n > 1 or 1.0, never 0, so the comparison never sees 0 and both forms agree.",
-    "reference_agent/governance.py:135 (Add->Sub)": "(Was line 134 before a docstring line was added.) log2(c / total + 1e-12) becomes log2(c / total - 1e-12). The 1e-12 only guards against log2(0), which cannot happen because every count is at least 1; the result moves by about 1e-12, and gamma() rounds to 4 decimal places.",
-    "reference_agent/governance.py:136 (Gt->GtE)": "(Was line 135.) len(counts) > 1 becomes >= 1. The only input that differs is one distinct word, where log2(1) is 0.0, the same as the else branch.",
     "reference_agent/mcp.py:148 (Gt->GtE)": "time.monotonic() > deadline becomes >=. They differ only at the single instant the clock equals the deadline, which no test can hit on purpose and which changes nothing but whether one more line is read.",
     "athanor/codec.py:12 (Lt->LtE)": "e < 2 becomes e <= 2. At e = 2 both branches give the same bits: 0x00200000 << 2 = 0x00800000, and (2 - 1) << 23 = 0x00800000.",
     "athanor/codec.py:63 (Lt->LtE)": "factor < 0 becomes factor <= 0. factor == 0 returned earlier (codec.py:58), so this line never sees 0.",

@@ -17,7 +17,7 @@ import hashlib
 import json
 from typing import Any, Protocol, runtime_checkable
 
-from . import agency, ethics
+from . import ethics
 
 
 class RecursionLimitError(RuntimeError):
@@ -223,9 +223,10 @@ class RuleEngine(ABC):
         refusal = ethics.check_request(initial_rendered)
         if refusal is not None:
             raise ethics.EthicsError(refusal["why"])
-        gamma = agency.directive_strength(initial_rendered)
-        if gamma > agency.GAMMA_MAX:
-            raise ethics.EthicsError(f"Directive strength {gamma} exceeds cap {agency.GAMMA_MAX}")
+        # Removed 2026-11-22: a check that directive_strength(initial_rendered) > GAMMA_MAX. It could never fire,
+        # because directive_strength is clamped at GAMMA_MAX. Made reachable (>=) it would refuse plain
+        # expressions such as "x * x * x" and "(p | ~p)", which score 0.85 only because their tokens repeat:
+        # directive strength measures sentences said to a person, not a rendered symbolic expression.
 
     def reduce_to_fixed_point(
         self,

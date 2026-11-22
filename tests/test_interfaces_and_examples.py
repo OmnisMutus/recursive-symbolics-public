@@ -27,6 +27,7 @@ from symbolics.interfaces import (
     RuleEngine,
     SymbolicBackend,
 )
+from symbolics.ethics import EthicsError
 
 
 class _ToggleBackend:
@@ -90,6 +91,25 @@ class TestProtocolsAndStore(unittest.TestCase):
         store_prev.put("k1", {"v": 1}, reason="init")
         store_prev._chain[0]["prev_hash"] = "1" * 64
         self.assertFalse(store_prev.verify_integrity())
+
+
+class TestTheConstitutionalCheck(unittest.TestCase):
+    """2026-11-22: the dead directive-strength guard was removed, not made reachable. These pin both halves."""
+
+    def engine(self):
+        return _OscillatingEngine(_ToggleBackend(), enforce_constitutional=True)
+
+    def test_repetitive_expressions_are_not_commands(self):
+        # each scores 0.85 by directive strength, only because its tokens repeat
+        for expr in ("x * x * x", "a & a & a", "(p | ~p)"):
+            self.engine()._validate_request(expr)
+
+    def test_a_request_about_another_person_is_still_refused(self):
+        with self.assertRaises(EthicsError):
+            self.engine()._validate_request("diagnose my brother")
+
+    def test_with_enforcement_off_nothing_is_checked(self):
+        _OscillatingEngine(_ToggleBackend(), enforce_constitutional=False)._validate_request("diagnose my brother")
 
 
 class TestRuleEngineBoundsAndErrors(unittest.TestCase):

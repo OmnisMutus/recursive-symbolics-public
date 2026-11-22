@@ -31,8 +31,9 @@ correspondence is apt, and it does not try: a claim can pass every duty here and
 world. What it guarantees is that the claim arrives with its uncertainty attached, which is the only thing a
 gate at the exit can guarantee.
 """
-import math
 import re
+
+from symbolics import agency
 
 CORE_AXIOM = ("True symbolic systems do not believe their own symbols — they operate them with calibrated "
               "epistemic humility as maps, not territory.")
@@ -60,7 +61,9 @@ HYPOTHESIS_DUTIES = ("formally defined in symbolic or mathematical notation",
 # Claiming identity between a thing and a symbol: what the Core Axiom forbids ("Anger is Geburah").
 # Both directions count. "Anger is Geburah" and "Shin represents Fire" are the same move, and an earlier
 # version of this pattern caught only the first, because it required the symbol to be the object.
-SYMBOLS = (r"Kether|Chokmah|Binah|Chesed|Geburah|Tiphareth|Netzach|Hod|Yesod|Malkuth|Da'?ath|"
+# Keter and Tifereth added 2026-11-22 (outside review): symbolics/metrics.py spells them that way, so "Balance is Tifereth."
+# was not seen as an identity claim.
+SYMBOLS = (r"Kether|Keter|Chokmah|Binah|Chesed|Geburah|Tiphareth|Tifereth|Netzach|Hod|Yesod|Malkuth|Da'?ath|"
            r"Aleph|Beth|Gimel|Daleth|Heh|Vav|Vau|Zayin|Zain|Cheth|Teth|Yod|Kaph|Lamed|Mem|Nun|Samekh|"
            r"Ayin|Peh|Pe|Tzaddi|Qoph|Resh|Shin|Tav|Tau")
 IS_VERB = r"(?:is|are|means|equals|represents|corresponds\s+to)"
@@ -86,22 +89,45 @@ class GovernanceError(Exception):
 def confidence(evidence_quality, pattern_coherence, alternatives):
     """The framework's formula, as a percentage. Inputs 0..1, 0..1, and a count of rival hypotheses >= 1."""
     for name, value in (("evidence_quality", evidence_quality), ("pattern_coherence", pattern_coherence)):
-        if not isinstance(value, (int, float)) or not 0 <= value <= 1:
+        # bool is an int in Python, so True would pass as 1.0 without the first test (fixed 2026-11-22)
+        if isinstance(value, bool) or not isinstance(value, (int, float)) or not 0 <= value <= 1:
             raise GovernanceError(f"{name} is a fraction from 0 to 1, so that a reader can argue with the "
                                   f"input rather than the output. Got {value!r}.")
-    n = int(alternatives or 0)
+    n = _whole("alternatives", alternatives)
     if n < 1:
         raise GovernanceError("alternatives is at least 1: there is always the hypothesis that the pattern "
                               "is coincidence, and leaving it out is how a quotient becomes a boast.")
     return round(100.0 * (float(evidence_quality) * float(pattern_coherence)) / n, 1)
 
 
+def _whole(name, value):
+    """A count: a whole number, or None for zero. True and 1.9 are refused rather than read as 1 (2026-11-22)."""
+    if value is None:
+        return 0
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise GovernanceError(f"{name} is a whole number, so that it cannot be rounded quietly. Got {value!r}.")
+    return value
+
+
+# A hedge counts only as a whole word or phrase, and only in the same sentence as the claim it excuses
+# (2026-11-22, an outside review: "I wiped my camera lens. Anger is Geburah." was excused by the "lens" of another sentence).
+_HEDGE = re.compile(r"\b(?:" + "|".join(re.escape(h) for h in HEDGED) + r")\b", re.IGNORECASE)
+_SENTENCE_END = re.compile(r"[.!?](?:\s|$)|\n")
+
+
+def _sentence_around(text, start, end):
+    """The sentence holding text[start:end]."""
+    before = [m.end() for m in _SENTENCE_END.finditer(text, 0, start)]
+    after = _SENTENCE_END.search(text, end)
+    return text[before[-1] if before else 0:after.start() if after else len(text)]
+
+
 def is_ontological(text):
     """Identity claims this framework forbids, minus the ones already said as a reading."""
+    text = text or ""
     out = []
-    for m in ONTOLOGICAL.finditer(text or ""):
-        window = (text or "")[max(0, m.start() - 110):m.end() + 60].casefold()
-        if any(h in window for h in HEDGED):
+    for m in ONTOLOGICAL.finditer(text):
+        if _HEDGE.search(_sentence_around(text, m.start(), m.end())):
             continue
         out.append(m.group(0).strip())
     return out
@@ -123,20 +149,13 @@ def occam(claim, explains, plain_explains):
 
 
 def gamma(text, cap=GAMMA_CAP):
-    """Directive strength from the spread of the agent's own wording, capped. Inherited from the framework's
-    agency budget: Shannon entropy over token frequencies, 1 - H_norm, clamped into [0, cap]."""
-    words = re.findall(r"\b\w+\b", (text or "").casefold())
-    if not words:
+    """Directive strength, capped, from the one measure the repository has: agency.directive_strength, the
+    higher of the entropy and the form readings. Until 2026-11-22 this was a second copy holding the entropy half
+    only, so "You must meditate every morning. It is the only way." scored 0.0 here and 0.85 in agency. No words
+    at all push nothing, so empty text is 0.0."""
+    if not re.search(r"\w", text or ""):
         return 0.0
-    counts = {}
-    for w in words:
-        counts[w] = counts.get(w, 0) + 1
-    total = len(words)
-    h = -sum((c / total) * math.log2(c / total + 1e-12) for c in counts.values())
-    h_max = math.log2(len(counts)) if len(counts) > 1 else 0.0
-    if h_max <= 0:
-        return float(cap)
-    return round(min(max(1.0 - (h / h_max), 0.0), float(cap)), 4)
+    return round(min(agency.directive_strength(text), float(cap)), 4)
 
 
 def rank(formally_defined=False, independent_practitioners=0, computationally_modelled=False):
@@ -146,7 +165,7 @@ def rank(formally_defined=False, independent_practitioners=0, computationally_mo
     software: "the suite passes" is not a Rank 4 observation, and reading it as one would be the overclaiming
     the standard exists to stop. A passing test is evidence about code, not about a correspondence.
     """
-    n = max(0, int(independent_practitioners or 0))
+    n = max(0, _whole("independent_practitioners", independent_practitioners))
     if not formally_defined:
         held_back = "it is not formally defined, so it is anecdote however often it is repeated"
         got = 1

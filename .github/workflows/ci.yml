@@ -51,7 +51,10 @@ jobs:
       run: |
         python -m symbolics.outgoing
 
-    - name: Run Full Unit & Mutation Test Suite
+    - name: Run the unit tests
+      # Until 2026-11-22 this step was named "Unit & Mutation" but ran only the unit tests. The mutation gate
+      # (python -B -m symbolics.mutate) joins CI once its known survivors, in engines/, examples/ and
+      # athanor/edits.py, are killed or recorded as equivalent in architecture/mutation_guards.json.
       run: |
         python -m unittest discover -s tests -v
 

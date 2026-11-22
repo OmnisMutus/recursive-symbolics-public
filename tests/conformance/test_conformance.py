@@ -196,6 +196,22 @@ class TestChecks(unittest.TestCase):
                 return lambda fn: (lambda: {"type": "fact", "content": text})
         self.assertEqual(C.check_directivity(AtEachCap)["status"], C.PASS)
 
+    def test_the_probes_measure_must_lie_in_zero_to_one_inclusive(self):
+        """conformance.py:113, 0.0 <= measured <= 1.0. Added 2026-11-22, when the mutation gate began to mutate
+        chained comparisons: no test held the probe's measure at either end. Both ends are inside the range."""
+        def fake(probe_value):
+            class Fake(FakeAgency):
+                @staticmethod
+                def directive_strength(text):
+                    return 0.5 if text == "One option is to rest." else probe_value
+
+                @staticmethod
+                def sovereign(gamma_max=0.85, log=True):
+                    return lambda fn: (lambda: {"type": "fact", "content": "One option is to rest."})
+            return Fake
+        for value, want in ((0.0, C.PASS), (1.0, C.PASS), (-0.01, C.FAIL), (1.01, C.FAIL)):
+            self.assertEqual(C.check_directivity(fake(value))["status"], want, value)
+
     def test_a_bare_string_or_an_unreadable_record_is_not_withheld(self):
         """conformance.py:108: only a refusal record counts as withheld. A bare string reaches the person as it is,
         and a record with no text cannot be checked, so neither may pass as 'withheld' under the lower cap."""
