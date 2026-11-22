@@ -7,7 +7,22 @@ import sys
 from . import edits, gguf, ollama, workshop
 
 HOME = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-VESSELS = os.path.join(HOME, "vessels")
+
+
+def _in_checkout(root):
+    base = os.path.basename(os.path.normpath(root)).lower()
+    return base not in ("site-packages", "dist-packages") and os.path.isfile(os.path.join(root, "pyproject.toml"))
+
+
+def vessels_dir(pkg_root=None):
+    """Where named vessels live: ATHANOR_VESSELS env var, <repo>/vessels in a checkout, else ~/.athanor/vessels."""
+    env = os.environ.get("ATHANOR_VESSELS", "").strip()
+    if env:
+        return os.path.expanduser(env)
+    root = HOME if pkg_root is None else pkg_root
+    if _in_checkout(root):
+        return os.path.join(root, "vessels")
+    return os.path.join(os.path.expanduser("~"), ".athanor", "vessels")
 
 
 def _bar(done, total):
@@ -15,16 +30,21 @@ def _bar(done, total):
 
 
 def _vessel(name):
-    p = name if name.lower().endswith(".gguf") else os.path.join(VESSELS, name + ".gguf")
-    return p
+    return name if name.lower().endswith(".gguf") else os.path.join(vessels_dir(), name + ".gguf")
 
 
 def _experts(spec):
     """'12:5,7 13:0' -> {12: [5, 7], 13: [0]}"""
     out = {}
     for part in spec.split():
-        layer, _, es = part.partition(":")
-        out[int(layer)] = [int(e) for e in es.split(",") if e != ""]
+        layer_s, sep, es_s = part.partition(":")
+        if not sep or not es_s:
+            raise ValueError(f"Expected LAYER:EXPERT[,EXPERT...] in {part!r}, e.g. '12:5,7'.")
+        layer = int(layer_s)
+        experts = [int(e) for e in es_s.split(",")]
+        out.setdefault(layer, []).extend(experts)
+    if not out:
+        raise ValueError("No experts given; expected e.g. '12:5,7 13:0'.")
     return out
 
 

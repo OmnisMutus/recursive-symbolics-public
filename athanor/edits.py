@@ -14,14 +14,32 @@ OFF = -1.0e4                          # far below any real router score: the exp
 
 
 def _layer_bias(info, layer):
+    if isinstance(layer, bool):
+        raise ValueError("Layer must be an integer.")
     return gguf.tensor(info, f"blk.{int(layer)}.ffn_gate_inp.bias")
+
+
+def _expert_slice(t, expert):
+    """Return (start, size) in bytes for a whole tensor or one expert's contiguous slice."""
+    start, size = t["start"], t["bytes"]
+    if expert is not None:
+        if len(t["shape"]) < 2:
+            raise ValueError(f"{t['name']} has no experts.")
+        n_exp = t["shape"][-1]
+        if isinstance(expert, bool) or not 0 <= int(expert) < n_exp:
+            raise ValueError(f"{t['name']} has experts 0 to {n_exp - 1}.")
+        if size % n_exp != 0:
+            raise ValueError(f"{t['name']} cannot be split evenly across {n_exp} experts.")
+        size = size // n_exp                     # the last dimension is the expert: its slice is contiguous
+        start += int(expert) * size
+    return start, size
 
 
 def router_bias(path, layer, expert, add=None, set_to=None, off=False):
     info = gguf.read(path)
     t = _layer_bias(info, layer)
     n = t["shape"][0]
-    if not 0 <= int(expert) < n:
+    if isinstance(expert, bool) or not 0 <= int(expert) < n:
         raise ValueError(f"Layer {layer} has experts 0 to {n - 1}.")
     if t["type"] != "F32":
         raise ValueError(f"{t['name']} is {t['type']}, expected F32.")
@@ -51,15 +69,7 @@ def scale(path, name, factor, expert=None):
     factor = float(factor)
     if not np.isfinite(factor) or (factor != 0 and not 1e-4 <= abs(factor) <= 1e4):
         raise ValueError("Factor must be 0 or between 0.0001 and 10000 in size.")
-    start, size = t["start"], t["bytes"]
-    if expert is not None:
-        if len(t["shape"]) < 2:
-            raise ValueError(f"{name} has no experts.")
-        n_exp = t["shape"][-1]
-        if not 0 <= int(expert) < n_exp:
-            raise ValueError(f"{name} has experts 0 to {n_exp - 1}.")
-        size = size // n_exp                     # the last dimension is the expert: its slice is contiguous
-        start += int(expert) * size
+    start, size = _expert_slice(t, expert)
     with open(path, "rb") as fh:
         fh.seek(start)
         raw = fh.read(size)
@@ -74,10 +84,7 @@ def values(path, name, expert=None, count=8):
     """A look at a tensor's numbers: first values and simple statistics."""
     info = gguf.read(path)
     t = gguf.tensor(info, name)
-    start, size = t["start"], t["bytes"]
-    if expert is not None:
-        size //= t["shape"][-1]
-        start += int(expert) * size
+    start, size = _expert_slice(t, expert)
     with open(path, "rb") as fh:
         fh.seek(start)
         v = codec.decode(fh.read(size), t["type"])

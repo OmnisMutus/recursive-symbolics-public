@@ -10,6 +10,7 @@ import shutil
 import struct
 import tempfile
 import unittest
+from unittest import mock
 
 try:
     import numpy as np
@@ -167,8 +168,16 @@ class TestJournal(Base):
 class TestVessel(unittest.TestCase):
     def setUp(self):
         self.d = tempfile.mkdtemp()
+        self.empty_ollama = os.path.join(self.d, "empty_ollama")
+        os.makedirs(self.empty_ollama)
+        self._old_ollama_models = os.environ.get("OLLAMA_MODELS")
+        os.environ["OLLAMA_MODELS"] = self.empty_ollama
 
     def tearDown(self):
+        if self._old_ollama_models is None:
+            os.environ.pop("OLLAMA_MODELS", None)
+        else:
+            os.environ["OLLAMA_MODELS"] = self._old_ollama_models
         shutil.rmtree(self.d, ignore_errors=True)
 
     def store(self, digest):
@@ -195,6 +204,13 @@ class TestVessel(unittest.TestCase):
         with self.assertRaises(ValueError):
             workshop.create("gpt-oss:20b", dest, models_dir=m)
         self.assertFalse(os.path.exists(dest) or os.path.exists(dest + ".part"))
+
+    def test_find_ollama_prefers_models_dir_and_falls_back_to_env(self):
+        m = self.store(sha(MINI))
+        want = os.path.join(m, "blobs", "sha256-" + sha(MINI))
+        self.assertEqual(gguf.find_ollama("gpt-oss:20b", models_dir=m), want)
+        with mock.patch.dict(os.environ, {"OLLAMA_MODELS": m}):
+            self.assertEqual(gguf.find_ollama("gpt-oss:20b"), want)
 
 
 class TestOllama(unittest.TestCase):
@@ -248,6 +264,56 @@ class TestCli(Base):
         self.assertTrue(workshop.pristine(v))
         self.assertEqual(cli.main(["scale", v, "blk.0.ffn_up_exps.weight", "3"]), 1)    # refused, not crashed
         self.assertEqual(cli._experts("12:5,7 13:0"), {12: [5, 7], 13: [0]})
+
+    def test_vessels_dir_never_points_into_site_packages(self):
+        checkout = os.path.join(self.d, "checkout")
+        os.makedirs(checkout)
+        with open(os.path.join(checkout, "pyproject.toml"), "w", encoding="utf-8") as fh:
+            fh.write("[project]\nname='recursive-symbolics'\n")
+        site_pkgs = os.path.join(self.d, "venv", "Lib", "site-packages")
+        dist_pkgs = os.path.join(self.d, "usr", "lib", "dist-packages")
+        os.makedirs(site_pkgs)
+        os.makedirs(dist_pkgs)
+        with open(os.path.join(dist_pkgs, "pyproject.toml"), "w", encoding="utf-8") as fh:
+            fh.write("")                                             # even with a stray pyproject, dist-packages stays fallback
+        empty_dir = os.path.join(self.d, "empty")
+        os.makedirs(empty_dir)
+        user_default = os.path.join(os.path.expanduser("~"), ".athanor", "vessels")
+        with mock.patch.dict(os.environ, {"ATHANOR_VESSELS": ""}):
+            self.assertEqual(cli.vessels_dir(checkout), os.path.join(checkout, "vessels"))
+            self.assertEqual(cli.vessels_dir(site_pkgs), user_default)
+            self.assertEqual(cli.vessels_dir(dist_pkgs), user_default)
+            self.assertEqual(cli.vessels_dir(empty_dir), user_default)
+        with mock.patch.dict(os.environ, {"ATHANOR_VESSELS": "   "}):
+            self.assertEqual(cli.vessels_dir(site_pkgs), user_default)
+        custom = os.path.join(self.d, "custom_vessels")
+        with mock.patch.dict(os.environ, {"ATHANOR_VESSELS": custom}):
+            self.assertEqual(cli.vessels_dir(site_pkgs), custom)
+            self.assertEqual(cli._vessel("demo"), os.path.join(custom, "demo.gguf"))
+        explicit = os.path.join(self.d, "explicit.gguf")
+        self.assertEqual(cli._vessel(explicit), explicit)
+
+    def test_experts_spec_rejects_malformed_and_merges_repeated_layers(self):
+        self.assertEqual(cli._experts("12:5 12:7,0"), {12: [5, 7, 0]})
+        for bad in ("12", "12:"):
+            with self.subTest(bad=bad), self.assertRaisesRegex(ValueError, "Expected LAYER:EXPERT"):
+                cli._experts(bad)
+        for bad in ("", "   ", "12:5,", "12:5,,7", ":5", "x:1"):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                cli._experts(bad)
+
+    def test_cli_values_and_off_refuse_bad_inputs_cleanly(self):
+        v = self.v
+        self.assertEqual(cli.main(["values", v, "blk.0.ffn_up_exps.weight", "--expert", "0"]), 0)
+        for args in (
+            ["values", v, "blk.0.ffn_up_exps.weight", "--expert", "-1"],
+            ["values", v, "blk.0.ffn_up_exps.weight", "--expert", "4"],
+            ["values", v, "blk.0.attn_norm.weight", "--expert", "0"],
+            ["off", v, "12"],
+            ["off", v, ""],
+        ):
+            with self.subTest(args=args):
+                self.assertEqual(cli.main(args), 1)
 
 
 class TestLinksAndInterruptions(Base):
@@ -467,6 +533,49 @@ class TestEditsGaps(Base):
         for bad in (9.9e-5, -9.9e-5, 10001.0, -10001.0):
             with self.assertRaises(ValueError, msg=repr(bad)):
                 edits.scale(self.v, name, bad)
+
+    def test_values_checks_expert_bounds_and_decodes_slice(self):
+        """edits.values() uses the same _expert_slice bounds as scale(): 0..3 ok, 1-D/-1/4/bool refused."""
+        name = "blk.0.ffn_gate_inp.weight"
+        rows = EXP[name].reshape(4, -1)
+        for exp in (0, 1, 3):
+            got = edits.values(self.v, name, expert=exp, count=4)
+            expected = rows[exp]
+            self.assertEqual(got["count"], int(expected.size))
+            self.assertEqual(got["first"], [round(float(x), 6) for x in expected[:4]])
+            self.assertAlmostEqual(got["mean"], float(expected.mean()), places=6)
+        self.assertEqual(edits.values(self.v, "blk.0.ffn_up_exps.weight", expert=3)["count"], 4096)
+        with self.assertRaisesRegex(ValueError, "has no experts"):
+            edits.values(self.v, "blk.0.attn_norm.weight", expert=0)
+        for bad in (-1, 4, True, False):
+            with self.subTest(bad=bad), self.assertRaisesRegex(ValueError, r"has experts 0 to 3\."):
+                edits.values(self.v, name, expert=bad)
+
+    def test_scale_and_router_bias_reject_negative_and_bool_experts_or_layers(self):
+        with self.assertRaisesRegex(ValueError, "Layer must be an integer"):
+            edits.router_bias(self.v, True, 0, off=True)
+        for bad in (-1, 4, True, False):
+            with self.subTest(fn="router_bias", bad=bad), self.assertRaisesRegex(ValueError, r"has experts 0 to 3\."):
+                edits.router_bias(self.v, 0, bad, off=True)
+            with self.subTest(fn="scale", bad=bad), self.assertRaisesRegex(ValueError, r"has experts 0 to 3\."):
+                edits.scale(self.v, "blk.0.ffn_gate_inp.weight", 2, expert=bad)
+
+    def test_uneven_expert_byte_size_is_refused(self):
+        """An MXFP4 tensor of shape [16, 4] is 2 blocks = 34 bytes, not divisible across 4 experts."""
+        nm = b"uneven"
+        hdr = (b"GGUF" + struct.pack("<IQQ", 3, 1, 0)
+               + struct.pack("<Q", len(nm)) + nm
+               + struct.pack("<IQQIQ", 2, 16, 4, 39, 0))
+        data_start = (len(hdr) + 31) // 32 * 32
+        src = os.path.join(self.d, "uneven_src.gguf")
+        ves = os.path.join(self.d, "uneven_ves.gguf")
+        with open(src, "wb") as fh:
+            fh.write(hdr + b"\x00" * (data_start - len(hdr)) + b"\x00" * 34)
+        workshop.create(src, ves, verify=False)
+        with self.assertRaisesRegex(ValueError, "cannot be split evenly"):
+            edits.values(ves, "uneven", expert=0)
+        with self.assertRaisesRegex(ValueError, "cannot be split evenly"):
+            edits.scale(ves, "uneven", 2, expert=0)
 
 class TestGgufGaps(unittest.TestCase):
     """Added 2026-11-20 for the public repository: each test kills a mutant of gguf.py that survived the original

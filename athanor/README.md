@@ -18,9 +18,10 @@ GGUF specification, no code taken: that repository has no licence).
 - Every change saves the old bytes first, with SHA-256 hashes. `undo` puts them back exactly, and refuses if the
   bytes were changed some other way.
 - A change is marked as pending before the model is touched. If the program is interrupted, the next command
-  finishes the record (new bytes in place) or drops it (old bytes still there), and stops if the bytes are
-  neither. A journal line torn by the interruption is cut and rewritten whole; damage anywhere else in the journal
-  stops everything instead of being guessed at.
+  finishes the record (new bytes in place) or drops it (old bytes still there); partial writes (neither old
+  nor new bytes) are rolled back from the verified undo backup, and recovery stops if that backup itself is
+  damaged. A journal line torn by the interruption is cut and rewritten whole; damage anywhere else in the
+  journal stops everything instead of being guessed at.
 - `pristine` checks the whole vessel is byte-for-byte the original again.
 
 ## The modules
@@ -42,7 +43,7 @@ Run from the repository root: `python -m athanor <command> ...`
 |---|---|
 | `inspect gpt-oss:20b` | Summary: parameters, layers, experts, quantization (read only) |
 | `inspect gptoss --tensors blk.12.` | Tensors matching a pattern |
-| `vessel gpt-oss:20b gptoss` | Copy the model to `vessels/gptoss.gguf` at the repository root (git-ignored: a copy is the size of the model), checked against Ollama's checksum |
+| `vessel gpt-oss:20b gptoss` | Copy the model to `vessels/gptoss.gguf` in a repository checkout, `~/.athanor/vessels/gptoss.gguf` when pip-installed, or `$ATHANOR_VESSELS/gptoss.gguf` if set (git-ignored: a copy is the size of the model), checked against Ollama's checksum |
 | `values gptoss blk.0.ffn_gate_inp.bias` | A tensor's numbers: first values, mean, min, max, zeros |
 | `bias gptoss 12 5 --off` | Switch expert 5 of layer 12 off (router bias -10000: never chosen) |
 | `bias gptoss 12 5 --add 0.5` | Make it fire more (or `--add -0.5` less, `--set 0`) |
