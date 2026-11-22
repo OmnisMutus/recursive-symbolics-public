@@ -47,6 +47,7 @@ import unittest
 import tempfile
 import contextlib
 from pathlib import Path
+from unittest import mock
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 _ENGINES = str(_REPO_ROOT / "engines")
@@ -239,6 +240,10 @@ class TestQualiaVector(RCASandboxTestCase):
         # (1.0 + 1.0) / 2.0 + 0.30 = 1.30 -> capped to 1.0
         self.assertEqual(q["Tau_resonance"], 1.0)
 
+    def test_h_emotional_uses_forward_bigrams_not_wraparound_reverse(self):
+        # 4 forward bigrams ("a c", "c b", "b c", "c b") -> 3 unique / 4 = 0.75.
+        self.assertEqual(compute_qualia_vector("a c b c b", {})["H_emotional"], 0.75)
+
 
 class TestGovernanceEvaluation(unittest.TestCase):
     def test_dominant_seph_is_highest_scoring(self):
@@ -288,6 +293,23 @@ class TestGovernanceEvaluation(unittest.TestCase):
         gov0 = evaluate_v2_governance("x", scores0)
         self.assertGreaterEqual(gov0["confidence_pct"], 20)
         self.assertLessEqual(gov0["confidence_pct"], 95)
+
+    def test_confidence_formula_matches_hand_computed_values_and_edge_dicts(self):
+        # Single-entry dict hits second_score = 0.0 without IndexError.
+        gov_single = evaluate_v2_governance("x", {"Geburah": 0.5})
+        self.assertEqual(gov_single["dominant_seph"], "Geburah")
+
+        # Hand-computed non-clamped two-entry case: (0.4 / 0.60001) * (0.4 - 0.2 + 0.2) * 100 * 2.5 = 66.665 -> 66.
+        gov_pair = evaluate_v2_governance("x", {"Geburah": 0.4, "Chesed": 0.2})
+        self.assertEqual(gov_pair["confidence_pct"], 66)
+
+        # Tiny-energy case guards total_energy + 1e-5 against ZeroDivisionError if + became -.
+        gov_tiny = evaluate_v2_governance("x", {"Geburah": 1e-5})
+        self.assertEqual(gov_tiny["confidence_pct"], 25)
+
+        # Non-Tifereth-first all-zero dict still falls back to Tifereth.
+        gov_zero_keter = evaluate_v2_governance("x", {"Keter": 0.0})
+        self.assertEqual(gov_zero_keter["dominant_seph"], "Tifereth")
 
 
 class TestComputeGamma(unittest.TestCase):
@@ -714,6 +736,58 @@ class TestSanitizePathsAndMemoryWarnings(unittest.TestCase):
                 eng = rca.RCALearningEngine(memory_path=bad_path)
             self.assertTrue(any(issubclass(w.category, RuntimeWarning) for w in caught))
             self.assertEqual(eng.total_interactions, 0)
+
+
+class TestProcessInteractionAndMain(unittest.TestCase):
+    def _run_isolated(self, text, perf_times=(10.0, 10.005)):
+        with tempfile.TemporaryDirectory() as tmp:
+            eng = RCALearningEngine(memory_path=Path(tmp) / "rca_mem.json")
+            buf = io.StringIO()
+            with mock.patch.object(rca, "LEARNING_ENGINE", eng), \
+                    mock.patch.object(rca.time, "perf_counter", side_effect=list(perf_times)), \
+                    contextlib.redirect_stdout(buf):
+                rca.process_interaction(text)
+            return buf.getvalue()
+
+    def test_process_interaction_renders_hand_computed_bar_pct_marker_and_latency(self):
+        # "code" vs 15-word Hod centroid: cos = 1/sqrt(15) + 0.15 = 0.408 -> bar_count=6, pct=40.
+        out = self._run_isolated("code", perf_times=(10.0, 10.005))
+        for expected in (
+            "=" * 70,
+            "  " + "-" * 60,
+            "\n" + "=" * 70 + "\n  SYMBOLIC OPERATING SYSTEM V2.0 - TELEMETRY DECK",
+            "\n" + "=" * 70 + "\n\n",
+            "-" * 70 + "\n  CONVERSATIONAL ASSISTANT RESPONSE:\n" + "-" * 70,
+            " > Execution Latency       : 5.000 ms [Budget: <=30ms]",
+            "  Hod        | ######......... |  40%  [DOMINANT]",
+            "  Keter      | ............... |   0%",
+        ):
+            self.assertIn(expected, out)
+        self.assertEqual(out.count("[DOMINANT]"), 1)
+
+    def test_process_interaction_zero_scores_falls_back_to_tifereth_balanced(self):
+        out = self._run_isolated("zzz qqq")
+        self.assertIn("Tifereth (Balanced)", out)
+        self.assertNotIn("[DOMINANT]", out)
+
+    def test_main_runs_interactive_loop_with_no_cli_args_and_one_shot_with_args(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            eng = RCALearningEngine(memory_path=Path(tmp) / "rca_mem.json")
+            buf_repl = io.StringIO()
+            with mock.patch.object(rca, "LEARNING_ENGINE", eng), \
+                    mock.patch.object(rca.sys, "argv", ["standalone_rca_sandbox.py"]), \
+                    mock.patch("builtins.input", side_effect=["exit"]), \
+                    contextlib.redirect_stdout(buf_repl):
+                rca.main()
+            self.assertIn("Closing Symbolic OS V2.0.", buf_repl.getvalue())
+
+            buf_cli = io.StringIO()
+            with mock.patch.object(rca, "LEARNING_ENGINE", eng), \
+                    mock.patch.object(rca.sys, "argv", ["standalone_rca_sandbox.py", "/help"]), \
+                    mock.patch("builtins.input", side_effect=AssertionError("input should not be called")), \
+                    contextlib.redirect_stdout(buf_cli):
+                rca.main()
+            self.assertIn("/eval", buf_cli.getvalue())
 
 
 def run_unit_test_suite():

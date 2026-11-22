@@ -16,6 +16,8 @@ Verifies:
 License: RCA Sephirotic Sovereignty License 1.1 (see LICENSE at the repository root)
 """
 
+import contextlib
+import io
 import sys
 import unittest
 from pathlib import Path
@@ -100,6 +102,29 @@ class TestSafeMemoryBoundarySuite(unittest.TestCase):
             smb.SafeMemoryAllocator(max_heap_limit=-1)
         self.assertEqual(smb.SafeMemoryAllocator().max_heap_limit, 268435456)
         self.assertEqual(smb.SafeMemoryAllocator(max_heap_limit=0).max_heap_limit, 0)
+
+    def test_printed_raw_byte_size_matches_width_times_height_times_bpp(self):
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            self.allocator.validate_and_allocate_image_buffer(width=1920, height=1080, bytes_per_pixel=4)
+        self.assertIn("8,294,400 bytes", buf.getvalue())
+
+    def test_main_runs_all_three_reference_cases_and_prints_exact_sizes(self):
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            smb.main()
+        out = buf.getvalue()
+        for expected in (
+            "8,294,400 bytes",
+            "1,600,000,000 bytes",
+            "17,180,131,328 bytes",
+            "ALLOCATION APPROVED",
+            "HEAP BOUND EXCEEDED",
+            "INTEGER OVERFLOW DETECTED",
+            "=" * 70,
+            "\n" + "=" * 70 + "\n Safe Memory Boundary",
+        ):
+            self.assertIn(expected, out)
 
 
 def run_unit_test_suite():

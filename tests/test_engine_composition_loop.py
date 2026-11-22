@@ -18,6 +18,8 @@ are ordinary correctness properties of new code, independent of what the
 composed experiment's results turn out to mean.
 """
 
+import contextlib
+import io
 import unittest
 
 try:
@@ -86,6 +88,20 @@ class TestMappedDynamicalSystemsBehaveAsDocumented(unittest.TestCase):
         maps = [ecl.SEPHIRAH_TO_MAP[s][0] for s in unprecedented]  # the name string
         self.assertEqual(len(set(maps)), 1, "all six should share literally the same map, by design")
 
+    def test_contraction_and_neutral_maps_match_hand_computed_values(self):
+        # Kills :111 (Mult/Sub) and :114/:115 (Add->Sub) using closed-form fixed points and one-step algebra.
+        for seph, expected_fp in (("Geburah", 1.0 / (1.0 - 0.1)), ("Tifereth", 1.0 / (1.0 - 0.5))):
+            _, F, S0, E = ecl.SEPHIRAH_TO_MAP[seph]
+            result = rae.classify_trajectory(rae.iterate(F, S0, E, n_steps=60))
+            self.assertEqual(result.kind, rae.AttractorType.FIXED_POINT, seph)
+            self.assertAlmostEqual(float(result.fixed_point[0]), expected_fp, places=5, msg=seph)
+
+        _, F_def, S0_def, E_def = ecl.SEPHIRAH_TO_MAP["Keter"]
+        hist_1 = rae.iterate(F_def, S0_def, E_def, n_steps=1)
+        self.assertAlmostEqual(float(hist_1[1][0]), 3.9 * 0.4 * 0.6, places=6)
+        hist_200 = rae.iterate(F_def, S0_def, E_def, n_steps=200)
+        self.assertEqual(rae.classify_trajectory(hist_200).kind, rae.AttractorType.BOUNDED_APERIODIC)
+
 
 class TestDescribeAttractorProducesDistinctText(unittest.TestCase):
     def _make(self, kind, period=None):
@@ -102,6 +118,16 @@ class TestDescribeAttractorProducesDistinctText(unittest.TestCase):
     def test_limit_cycle_description_mentions_the_real_period(self):
         text5 = ecl.describe_attractor(self._make(rae.AttractorType.LIMIT_CYCLE, period=5))
         self.assertIn("period 5", text5)
+
+    def test_bounded_aperiodic_and_insufficient_history_texts_match_their_branches(self):
+        self.assertEqual(
+            ecl.describe_attractor(self._make(rae.AttractorType.BOUNDED_APERIODIC)),
+            ecl.DEFAULT_TEMPLATES["BOUNDED_APERIODIC"],
+        )
+        self.assertEqual(
+            ecl.describe_attractor(self._make(rae.AttractorType.INSUFFICIENT_HISTORY)),
+            "Insufficient history to classify.",
+        )
 
 
 class TestMetaClassificationDetectsObviousPatterns(unittest.TestCase):
@@ -166,9 +192,20 @@ class TestLearningWeightsPinnedAndRestored(unittest.TestCase):
             "import sys; sys.modules['numpy'] = None; "
             "import engines.engine_composition_loop"
         )
-        res = subprocess.run([sys.executable, "-c", code], cwd=str(ecl._REPO_ROOT), capture_output=True, text=True)
+        res = subprocess.run([sys.executable, "-B", "-c", code], cwd=str(ecl._REPO_ROOT), capture_output=True, text=True)
         self.assertNotEqual(res.returncode, 0)
         self.assertIn("numpy is required", res.stderr)
+
+    def test_main_runs_cleanly_when_total_interactions_is_zero(self):
+        import standalone_rca_sandbox as rca
+        orig = rca.LEARNING_ENGINE.total_interactions
+        rca.LEARNING_ENGINE.total_interactions = 0
+        try:
+            with contextlib.redirect_stdout(io.StringIO()):
+                results = ecl.main()
+        finally:
+            rca.LEARNING_ENGINE.total_interactions = orig
+        self.assertEqual(set(results.keys()), set(ecl.SEPHIRAH_ORDER))
 
 
 if __name__ == "__main__":

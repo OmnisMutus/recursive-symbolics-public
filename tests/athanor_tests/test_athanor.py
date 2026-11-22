@@ -456,6 +456,18 @@ class TestEditsGaps(Base):
         with self.assertRaisesRegex(ValueError, "has no experts"):
             edits.scale(self.v, "blk.0.attn_norm.weight", 2, expert=0)     # 1-D: no experts
 
+    def test_scale_factor_bounds_are_inclusive_and_outside_is_refused(self):
+        """edits.py:52, 1e-4 <= abs(factor) <= 1e4: both ends (+/-) pass; outside raises ValueError."""
+        name = "blk.0.ffn_gate_inp.weight"
+        before = EXP[name].astype(np.float32)
+        for factor in (1e-4, -1e-4, 1e4, -1e4):
+            edits.scale(self.v, name, factor)
+            np.testing.assert_allclose(tensor_values(self.v, name), before * np.float32(factor), rtol=1e-6)
+            workshop.undo(self.v)
+        for bad in (9.9e-5, -9.9e-5, 10001.0, -10001.0):
+            with self.assertRaises(ValueError, msg=repr(bad)):
+                edits.scale(self.v, name, bad)
+
 class TestGgufGaps(unittest.TestCase):
     """Added 2026-11-20 for the public repository: each test kills a mutant of gguf.py that survived the original
     suite. Ground truth: GGUF files built byte by byte here from the format (llama.cpp's gguf.md: magic, version,

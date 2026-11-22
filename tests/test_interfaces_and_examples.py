@@ -186,12 +186,56 @@ class TestAlgebraSimplifierGroundTruth(unittest.TestCase):
                 )
 
     def test_empty_and_malformed_inputs_raise_cleanly(self):
-        for bad in ("", "   ", "x +", "(x + 1", "@bad"):
+        for bad in ("", "   ", "x +", "(x + 1", "@bad", 123):
             with self.assertRaises(ValueError):
-                self.backend.parse(bad)
+                self.backend.parse(bad)  # type: ignore[arg-type]
+        with self.assertRaisesRegex(ValueError, "non-empty string"):
+            self.backend.parse("")
         with self.assertRaises(KeyError):
             self.backend.evaluate(Var("missing"), {})
         self.assertEqual(self.backend.complexity(Const(42)), 1)
+
+    def test_canonical_formatting_parenthesizes_only_when_precedence_requires(self):
+        cases = [
+            ("x * (y + z)", "x * (y + z)"),
+            ("x + y * z", "x + y * z"),
+            ("x + (y + z)", "x + y + z"),
+            ("x - (y + z)", "x - (y + z)"),
+            ("(x + y) - z", "x + y - z"),
+            ("x - y * z", "x - y * z"),
+            ("x * (y * z)", "x * y * z"),
+        ]
+        env = {"x": 2, "y": 5, "z": 3}
+        for raw, expected in cases:
+            ast_in = self.backend.parse(raw)
+            formatted = self.backend.format(ast_in)
+            self.assertEqual(formatted, expected, raw)
+            self.assertEqual(
+                self.backend.evaluate(ast_in, env),
+                self.backend.evaluate(self.backend.parse(formatted), env),
+                raw,
+            )
+
+    def test_complexity_counts_every_ast_node(self):
+        self.assertEqual(self.backend.complexity(self.backend.parse("-x")), 2)
+        self.assertEqual(self.backend.complexity(self.backend.parse("x + y")), 3)
+        self.assertEqual(self.backend.complexity(self.backend.parse("-(x + y * 2)")), 6)
+
+    def test_left_identities_inverses_and_nontrivial_constant_mul(self):
+        env = {"x": 7, "y": -3}
+        t_mul = self.engine.reduce_to_fixed_point("3 * 4")
+        self.assertEqual(t_mul.final, "12")
+        self.assertEqual(t_mul.steps[0].rule, "constant_fold_mul")
+        self.assertEqual(self.backend.evaluate(t_mul.final_expression, env), 12)
+
+        for raw, expected in (("0 + x", "x"), ("2 + x", "2 + x"), ("(-x) + x", "0"), ("(-x) + y", "-x + y")):
+            trace = self.engine.reduce_to_fixed_point(raw)
+            self.assertEqual(trace.final, expected, raw)
+            self.assertEqual(
+                self.backend.evaluate(self.backend.parse(raw), env),
+                self.backend.evaluate(trace.final_expression, env),
+                raw,
+            )
 
 
 class TestPropositionalReducerGroundTruth(unittest.TestCase):
@@ -226,13 +270,34 @@ class TestPropositionalReducerGroundTruth(unittest.TestCase):
             _, rule = self.reducer.rewrite_once(trace.final_expression)
             self.assertIsNone(rule)
 
+    def test_invalid_inputs_complexity_default_backend_and_or_annihilation(self):
+        with self.assertRaisesRegex(ValueError, "non-empty string"):
+            self.backend.parse("")
+        with self.assertRaises(ValueError):
+            self.backend.parse(123)  # type: ignore[arg-type]
+
+        self.assertEqual(self.backend.complexity(self.backend.parse("p")), 1)
+        self.assertEqual(self.backend.complexity(self.backend.parse("~p")), 2)
+        self.assertEqual(self.backend.complexity(self.backend.parse("p & q")), 3)
+        self.assertEqual(self.backend.complexity(self.backend.parse("~p & (q | r)")), 6)
+
+        default_reducer = PropositionalReducer()
+        self.assertEqual(default_reducer.reduce_to_fixed_point("p & p").final, "p")
+
+        for raw in ("True | p", "p | True"):
+            ast_in = self.backend.parse(raw)
+            tt_in = self.backend.truth_table(ast_in, ("p",))
+            trace = self.reducer.reduce_to_fixed_point(raw)
+            self.assertEqual(trace.final, "True", raw)
+            self.assertEqual(tt_in, self.backend.truth_table(trace.final_expression, ("p",)), raw)
+
 
 class TestQuickstartScript(unittest.TestCase):
     def test_quickstart_executes_end_to_end(self):
         repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         script = os.path.join(repo_root, "examples", "quickstart.py")
         proc = subprocess.run(
-            [sys.executable, script],
+            [sys.executable, "-B", script],
             cwd=repo_root,
             capture_output=True,
             text=True,

@@ -495,9 +495,11 @@ def process_interaction(user_input: str):
     max_len = 15
     for seph, score in scores.items():
         bar_count = int(score * max_len)
-        bar = "" * bar_count + "" * (max_len - bar_count)
+        # ASCII bar characters restore the visual progress bar cleanly without empty-string repetition.
+        bar = "#" * bar_count + "." * (max_len - bar_count)
         pct = int(score * 100)
-        marker = "  [DOMINANT]" if seph == dominant_seph and score > 0 else ""
+        # dominant_seph matches a Sephirah key only when top score > 0 (line 470).
+        marker = "  [DOMINANT]" if seph == dominant_seph else ""
         print(f"  {seph:10s} | {bar} | {pct:3d}%{marker}")
     print("  " + "-"*60)
     

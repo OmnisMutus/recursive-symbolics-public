@@ -2,11 +2,14 @@
 formula that shares no code with the first, and the reference agency_budget.py, read from
 tests/fixtures/. The diagnostic sentences are real ones, taken from the
 replies written into engines/standalone_rca_sandbox.py and from ETHICS.md."""
+import contextlib
 import importlib.util
+import io
 import math
 import os
 import sys
 import unittest
+from unittest import mock
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "engines"))
 import sovereign_wrapper as sw
@@ -164,6 +167,13 @@ class TestAlternativesNote(unittest.TestCase):
         self.assertLessEqual(sw.directive_strength(logits), 0.40)
         self.assertFalse(self.has_note(logits, 1))
 
+    def test_exactly_at_alternatives_above_threshold_does_not_add_note(self):
+        self.assertEqual(sw.ALTERNATIVES_ABOVE, 0.40)
+        self.assertTrue(self.has_note([1.8, 0.0], 1))
+        # Using MAX_GAMMA (0.85) with logits=None tests exact effective == ALTERNATIVES_ABOVE without float ULP drift.
+        with mock.patch.object(sw, "ALTERNATIVES_ABOVE", sw.MAX_GAMMA):
+            self.assertFalse(self.has_note(None, 1))
+
     def test_unknown_strength_is_treated_as_the_maximum(self):
         result = sw.guard("Try a walk.", None, 1)
         self.assertIn(sw.ALTERNATIVES_NOTE, result["content"])
@@ -202,6 +212,10 @@ class TestNothingChangesSilently(unittest.TestCase):
 
     def test_the_alternatives_note_keeps_the_trailing_newline(self):
         self.assertEqual(sw.guard("Try a walk.\n", None, 1)["content"], "Try a walk. " + sw.ALTERNATIVES_NOTE + "\n")
+
+    def test_two_withheld_sentences_followed_by_a_kept_sentence_keep_their_separator(self):
+        text = "You're experiencing a high-friction Geburah state. You're in a Tifereth state. Rest helps."
+        self.assertEqual(sw.guard(text, alternatives=2)["content"], sw.WITHHELD_NOTE + " Rest helps.")
 
 
 class TestOrdinarySentencesAreKept(unittest.TestCase):
@@ -280,6 +294,27 @@ class TestTheWrapper(unittest.TestCase):
         for bad in (True, False, -1):
             with self.assertRaises(ValueError):
                 sw.guard("Do this.", alternatives=bad)
+
+    def test_guard_allows_zero_alternatives(self):
+        result = sw.guard("Try a walk.", None, alternatives=0)
+        self.assertEqual(result["sovereignty_metadata"]["alternatives_presented"], 0)
+        self.assertIn(sw.ALTERNATIVES_NOTE, result["content"])
+
+    def test_demo_prints_model_person_and_all_intervention_placeholders(self):
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            sw._demo()
+        out = buf.getvalue()
+        for expected in (
+            "MODEL SAID:\n  ",
+            "\nPERSON SEES:\n  ",
+            "withheld_diagnosis: You're experiencing a high-friction Geburah state.",
+            "softened_directive: You must break this into simpler steps.\n      -> An effective approach is to break this into simpler steps.",
+            "added_alternatives_note: (nothing)",
+            f"      -> {sw.ALTERNATIVES_NOTE}",
+            "      -> (withheld)",
+        ):
+            self.assertIn(expected, out)
 
 
 if __name__ == "__main__":

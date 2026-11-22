@@ -27,6 +27,8 @@ the four break-it proofs run during development (see the commit message
 this file ships with for the exact injected bugs and their results).
 """
 
+import contextlib
+import io
 import sys
 import math
 import unittest
@@ -44,7 +46,7 @@ if _ENGINES not in sys.path:
 
 from recursive_attractor_engine import (
     iterate, classify_trajectory, tiphareth_integrate,
-    AbyssException, AttractorType,
+    AbyssException, AttractorType, main as rae_main,
 )
 
 
@@ -176,6 +178,24 @@ class TestAbyssExceptionDaathGuard(unittest.TestCase):
         except AbyssException:
             self.fail("AbyssException raised on a genuinely bounded trajectory")
 
+    def test_exact_step_numbers_and_magnitude_cap_boundary(self):
+        # Exact magnitude_cap boundary passes; one step past raises naming step 1.
+        hist_eq = iterate(lambda S, E: E, S0=np.array([0.0]), E=np.array([10.0]), n_steps=3, magnitude_cap=10.0)
+        self.assertEqual(len(hist_eq), 4)
+        with self.assertRaises(AbyssException) as e_cap:
+            iterate(lambda S, E: E, S0=np.array([0.0]), E=np.array([10.0001]), n_steps=3, magnitude_cap=10.0)
+        self.assertIn("at step 1.", str(e_cap.exception))
+
+        # Exact analytical doubling: 2^9 = 512 <= 1000 < 1024 = 2^10, so step == 10.
+        with self.assertRaises(AbyssException) as e_dbl:
+            iterate(lambda S, E: 2.0 * S, S0=np.array([1.0]), E=np.array([0.0]), n_steps=20, magnitude_cap=1000.0)
+        self.assertIn("at step 10.", str(e_dbl.exception))
+
+        # NaN on step 1 names "at step 1:" (not step -1).
+        with self.assertRaises(AbyssException) as e_nan:
+            iterate(lambda S, E: S * float("nan"), S0=np.array([1.0]), E=np.array([0.0]), n_steps=5)
+        self.assertIn("at step 1:", str(e_nan.exception))
+
 
 class TestTiphareth(unittest.TestCase):
     def test_uniform_weights_matches_hand_computed_mean(self):
@@ -248,9 +268,39 @@ class TestClassifyTrajectoryEdgeCases(unittest.TestCase):
             "import sys; sys.modules['numpy'] = None; "
             "import engines.recursive_attractor_engine"
         )
-        res = subprocess.run([sys.executable, "-c", code], cwd=repo_root, capture_output=True, text=True)
+        res = subprocess.run([sys.executable, "-B", "-c", code], cwd=repo_root, capture_output=True, text=True)
         self.assertNotEqual(res.returncode, 0)
         self.assertIn("numpy is required", res.stderr)
+
+    def test_two_state_and_short_history_period_boundaries(self):
+        self.assertEqual(classify_trajectory([np.array([1.0]), np.array([1.0])]).kind, AttractorType.FIXED_POINT)
+        self.assertEqual(classify_trajectory([np.array([1.0]), np.array([2.0])]).kind, AttractorType.BOUNDED_APERIODIC)
+        self.assertEqual(
+            classify_trajectory([np.array([0.0]), np.array([1.0]), np.array([2.0])]).kind,
+            AttractorType.BOUNDED_APERIODIC,
+        )
+        res2 = classify_trajectory([np.array([0.0]), np.array([1.0]), np.array([0.0])])
+        self.assertEqual((res2.kind, res2.period), (AttractorType.LIMIT_CYCLE, 2))
+        res3 = classify_trajectory([np.array([0.0]), np.array([1.0]), np.array([2.0]), np.array([0.0])], max_period_check=3)
+        self.assertEqual((res3.kind, res3.period), (AttractorType.LIMIT_CYCLE, 3))
+
+    def test_main_demonstration_prints_each_textbook_regime(self):
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            rae_main()
+        out = buf.getvalue()
+        for expected in (
+            "=" * 72,
+            "RECURSIVE ATTRACTOR ENGINE",
+            "Linear contraction map   : FIXED_POINT (fixed point ~= [2.])",
+            "Logistic map (r=3.2)     : LIMIT_CYCLE (period=2)",
+            "Logistic map (r=3.9)     : BOUNDED_APERIODIC",
+            "Divergent map            : AbyssException raised correctly",
+            "Tiphareth integration",
+            "[1. 1.]",
+            "\n" + "=" * 72 + "\n  Status: Recursive Attractor Engine Demonstration Complete",
+        ):
+            self.assertIn(expected, out)
 
 
 def run_unit_test_suite():
