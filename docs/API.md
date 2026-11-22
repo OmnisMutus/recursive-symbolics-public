@@ -5,22 +5,10 @@ was written before the code, as if the code already existed. Every output shown 
 for the same input. The code is then written to match the examples. The modules underneath stay exactly as they
 are. The method's source is credited when the exercise ends.
 
-## The problem this repository works on
+## Why an API
 
-Minds, human and artificial alike, slip in four quiet ways:
-
-- **uncertainty** becomes a confident answer;
-- **a preference** becomes a command;
-- **an interpretation** becomes apparent reality;
-- **"it ran"** becomes "it is correct".
-
-An AI does it to please. A person does it to themselves: they take a reading of their own state as the truth
-about it, say a tired yes at the end of a long run, or forget what they believed before they were corrected.
-The usual cure, a stern filter, takes the decision away from both of them. This repository's answer is checks
-in code that hold both sides alike: the reading offers its alternatives and asks back, the gate shows the
-whole payload before the yes, and the record keeps every past belief beside its correction.
-
-Those checks only protect anyone who reaches them. So the API's job is to make **the honest path the easy
+The [README](../README.md) names the four slips this repository works against, and the checks it puts in code
+to hold a person and a program alike. Those checks only protect anyone who reaches them. So the API's job is to make **the honest path the easy
 path**, for the person asking as much as for the program asking for them.
 
 ## The problem, felt first-hand

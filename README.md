@@ -13,8 +13,13 @@ Minds, human and artificial alike, slip in four quiet ways:
 - an interpretation becomes apparent reality;
 - "it ran" becomes "it is correct".
 
+An AI does it to please. A person does it to themselves: they take a reading of their own state as the truth
+about it, say a tired yes at the end of a long session, or forget what they believed before they were corrected.
+The usual cure, a stern filter, takes the decision away from both of them.
+
 This repository puts checks against those slips in code, where they can be tested, rather than in a prompt or a
-promise. The checks hold the person and the program alike, and neither one gets to override the other.
+promise. The checks hold the person and the program alike: a reading offers its alternatives and asks back, a
+gate shows the whole request before anyone says yes, and the record keeps every past belief beside its correction.
 
 New here? [ELI5.md](docs/ELI5.md) explains the whole repository in plain words.
 

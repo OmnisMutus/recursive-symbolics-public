@@ -7,16 +7,17 @@ everyday picture that helps, and where it lives, so you can go and look.
 
 ## The one-sentence version
 
-It is a toolkit for making an AI (or any program) **tell the truth instead of telling you what you want to
-hear**, built so that the rules are checked by code rather than promised in a document.
+It is a toolkit that helps a person and a program **not fool themselves or each other**, built so that the
+rules are checked by code rather than promised in a document.
 
 ---
 
 ## The problem it works on
 
-Imagine asking a very eager helper a question. It wants you to be happy, so it agrees with you, sounds sure when
-it is not, and sometimes invents a source to look helpful. That is called **sycophancy**, and AI systems drift into
-it easily.
+Everyone, people and AIs alike, slips in the same four ways: being unsure but sounding sure, turning a wish into
+an order, mistaking an opinion for a fact, and thinking "it ran" means "it works". An eager AI helper does it to
+please you; that is called **sycophancy**. People do it to themselves, for example by agreeing to something just
+because they are tired. The [README](../README.md) lists the four slips exactly.
 
 The usual fix is a stern guard that blocks things. That stops some harm, but it also takes the decision away from
 you.
