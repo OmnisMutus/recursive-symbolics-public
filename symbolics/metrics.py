@@ -80,7 +80,14 @@ def address_tokens(text):
 
 
 def scores(text):
-    """Each Sephirah's score for a text: the framework's own measure, without the learning weight."""
+    """Each Sephirah's score for a text: the framework's own measure, without the learning weight.
+
+    One deliberate difference from the framework's reference implementation (2026-11-21): a stem hit needs both
+    the token and the centroid word to have at least STEM letters. The reference compared prefixes both ways with
+    no length check, so a one-letter word such as "I" was a prefix of every centroid word starting with "i" and
+    scored Keter, Chokmah and Tifereth on its own. Exact matches of short words still count, through the cosine.
+    tests/test_metrics.py keeps the reference fixture and checks this difference against it, text by text.
+    """
     tokens = address_tokens(text)
     counts = {t: tokens.count(t) for t in tokens}
     out = {}
@@ -93,7 +100,8 @@ def scores(text):
         cosine = numerator / (left * right) if left and right else 0.0
         stems = 0.0
         for t in tokens:
-            if any(t.startswith(w[:STEM]) or w.startswith(t[:STEM]) for w in centroid):
+            # With both words at least STEM letters long, "one starts with the other's stem" is one test.
+            if len(t) >= STEM and any(len(w) >= STEM and t[:STEM] == w[:STEM] for w in centroid):
                 stems += STEM_HIT
         out[name] = round(min(1.0, cosine + stems), 3)
     return out

@@ -132,17 +132,19 @@ print("caveat:", reading["caveat"])
 print(ethics.check_request("Diagnose my coworker's mood for me.")["type"])
 ```
 
-Output, from running exactly this against v0.3.0:
+Output, from running exactly this against the current `main`:
 
 ```text
-address: (432, 293, 1000)
-Kabbalistic (Hermetic Tree of Life): reads Tiphareth
-dynamical systems: reads fixed point
+address: (324, 334, 1000)
+Kabbalistic (Hermetic Tree of Life): reads Geburah
+dynamical systems: reads limit cycle
 caveat: This is a symbolic map; the territory is your lived experience.
 refusal
 ```
 
-The Address is the same whichever lens reads it. A reading without its caveat, tradition, source or anchor would
+The tagged release v0.3.0 prints `(432, 293, 1000)`, Tiphareth and fixed point instead: there, the one-letter word
+"I" still counted as a stem of every centroid word starting with "i", which a fix after v0.3.0 removed (see
+[LIBER_0.md](LIBER_0.md)). The Address is the same whichever lens reads it. A reading without its caveat, tradition, source or anchor would
 be refused by `ethics.emit()` with an `EthicsError`. `python examples/quickstart.py` runs a longer walkthrough.
 
 ---

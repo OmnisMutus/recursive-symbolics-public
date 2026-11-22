@@ -42,6 +42,32 @@ or "none: <the reason no test can>". Required when the Result says FAILED or COR
 
 ## Entries
 
+### 2026-11-21: a one-letter word scored three Sephirot by "stem"; short words no longer match by stem
+
+**Attempted:** Check by hand the README example's Address, after an outside reviewer computed its second coordinate
+as 292 where the README said 293.
+
+**Result:** CORRECTED. The README was right about its own output: rerun on the installed v0.3.0 package and on a
+fresh checkout of the tag, it printed `(432, 293, 1000)`; the unrounded descent is 292.5896, which `address.clamp`
+rounds to 293 (truncating gives 292). The hand calculation found a real fault instead. `metrics.scores()` counted
+a stem hit when either word started with the other's first four letters, with no length check, so the one-letter
+token "i" matched every centroid word starting with "i" and gave Keter, Chokmah and Tifereth 0.15 each: three of the
+example's five scores came from the pronoun "I" alone. A stem hit now needs both words to have at least four letters
+(exact matches of short words still count, through the cosine). The example now reads `(324, 334, 1000)`, Geburah
+and limit cycle; the README says so and keeps v0.3.0's output beside it. The reference fixture was not regenerated:
+the test now requires exact agreement with it wherever no short-word stem hit is involved, and exactly 0.15 less per
+such hit elsewhere (9 scores in the fixture, one of them clipped at 1.0 and only bounded). The mutation run also
+found 7 older gaps in `metrics.py` (scoreless texts, the derivation text, the latency boundaries), now tested:
+`metrics.py` 26 of 27 killed, the 27th an equivalent recorded with its reason. Full suite 580 tests OK on Python 3.14
+and 3.11.
+
+**Guard:** tests/test_metrics.py::test_agrees_with_the_reference_on_every_text, tests/test_metrics.py::test_a_short_word_matches_nothing_by_stem, tests/test_metrics.py::test_a_four_letter_stem_still_matches
+
+**Notes:** The engines' own sandbox (`engines/standalone_rca_sandbox.py`) and the corpus keep their own copies of
+the scoring and were not changed; they still have the short-word behaviour. A copy of v0.3.0 is installed in this
+machine's global Python (installed 2026-11-21 02:24, not by this work), so a script run outside the repository
+imports the old rule.
+
 ### 2026-11-21: release v0.3.0, so an install can name fixed code
 
 **Attempted:** Make the documented install reproducible. An outside evaluation pointed out that
