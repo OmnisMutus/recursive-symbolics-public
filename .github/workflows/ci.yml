@@ -52,11 +52,16 @@ jobs:
         python -m symbolics.outgoing
 
     - name: Run the unit tests
-      # Until 2026-11-22 this step was named "Unit & Mutation" but ran only the unit tests. The mutation gate
-      # (python -B -m symbolics.mutate) joins CI once its known survivors, in engines/, examples/ and
-      # athanor/edits.py, are killed or recorded as equivalent in architecture/mutation_guards.json.
+      # Until 2026-11-22 this step was named "Unit & Mutation" but ran only the unit tests.
       run: |
         python -m unittest discover -s tests -v
+
+    - name: Run the mutation gate (once, on one Python, because it is slow)
+      # Fails if any mutant survives that architecture/mutation_guards.json does not record as equivalent.
+      # Added 2026-11-22, when the last of the 158 survivors from its first whole run was closed.
+      if: matrix.python-version == '3.12'
+      run: |
+        python -B -m symbolics.mutate
 
     - name: Run athanor's planted-bug check (all 13 must be caught; the symlink ones need Linux)
       run: |
