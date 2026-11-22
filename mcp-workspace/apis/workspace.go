@@ -926,19 +926,21 @@ type briefSummaries struct {
 }
 
 type brief struct {
-	Project        string         `json:"project"`
-	Commit         string         `json:"commit,omitempty"`
-	Clean          bool           `json:"clean"`
-	Git            string         `json:"git,omitempty"`
-	LastNote       *briefNote     `json:"last_note"`
-	Notes          int            `json:"notes"`
-	CommitsSince   *int           `json:"commits_since_last_note,omitempty"`
-	OpenUnknowns   []briefItem    `json:"open_unknowns"`
-	NeedsAttention []briefItem    `json:"needs_attention"` // MOVED, BROKEN or GONE, open or not resolved
-	Anchors        map[string]int `json:"anchors"`
-	Summaries      briefSummaries `json:"summaries"`
-	Results        []briefResult  `json:"results_at_this_commit"`
-	Caveat         string         `json:"caveat"`
+	Project            string         `json:"project"`
+	Commit             string         `json:"commit,omitempty"`
+	Clean              bool           `json:"clean"`
+	Git                string         `json:"git,omitempty"`
+	LastNote           *briefNote     `json:"last_note"`
+	Notes              int            `json:"notes"`
+	CommitsSince       *int           `json:"commits_since_last_note,omitempty"`
+	OpenUnknowns       []briefItem    `json:"open_unknowns"`
+	OpenUnknownsMore   int            `json:"open_unknowns_more,omitempty"`
+	NeedsAttention     []briefItem    `json:"needs_attention"` // BROKEN/GONE first, then MOVED; newest first, up to 20
+	NeedsAttentionMore int            `json:"needs_attention_more,omitempty"`
+	Anchors            map[string]int `json:"anchors"`
+	Summaries          briefSummaries `json:"summaries"`
+	Results            []briefResult  `json:"results_at_this_commit"`
+	Caveat             string         `json:"caveat"`
 }
 
 // head is the first sentence of a claim, cut at wsHeadMax bytes on a rune boundary.
@@ -963,6 +965,14 @@ func head(claim string) (string, bool) {
 func itemOf(r recalled) briefItem {
 	h, more := head(r.Claim)
 	return briefItem{ID: r.ID, Path: r.Path, Lines: r.Lines, State: r.State, Now: r.Now, Head: h, More: more}
+}
+
+// attentionRank puts broken or missing evidence (0) ahead of evidence that merely moved (1).
+func attentionRank(state string) int {
+	if state == stateBroken || state == stateGone {
+		return 0
+	}
+	return 1
 }
 
 // commitsSince counts the commits from one commit to HEAD, for "how much has changed since the last note".
@@ -1016,14 +1026,40 @@ func (s *AgentBaseMCPServer) doBrief(project string) (string, error) {
 		return "", err
 	}
 	b.Anchors = counts
+	var openUnknowns []recalled
+	var attention []recalled
 	for _, r := range rows {
-		if r.Open && len(b.OpenUnknowns) < wsBriefList {
-			b.OpenUnknowns = append(b.OpenUnknowns, itemOf(r))
+		if r.Open {
+			openUnknowns = append(openUnknowns, r)
 		}
 		changed := r.State == stateMoved || r.State == stateBroken || r.State == stateGone
-		if changed && r.Resolution == "" && len(b.NeedsAttention) < wsBriefList {
-			b.NeedsAttention = append(b.NeedsAttention, itemOf(r))
+		if changed && r.Resolution == "" {
+			attention = append(attention, r)
 		}
+	}
+	sort.Slice(openUnknowns, func(i, j int) bool {
+		return openUnknowns[i].ID > openUnknowns[j].ID
+	})
+	if len(openUnknowns) > wsBriefList {
+		b.OpenUnknownsMore = len(openUnknowns) - wsBriefList
+		openUnknowns = openUnknowns[:wsBriefList]
+	}
+	for _, r := range openUnknowns {
+		b.OpenUnknowns = append(b.OpenUnknowns, itemOf(r))
+	}
+	sort.Slice(attention, func(i, j int) bool {
+		ri, rj := attentionRank(attention[i].State), attentionRank(attention[j].State)
+		if ri != rj {
+			return ri < rj
+		}
+		return attention[i].ID > attention[j].ID
+	})
+	if len(attention) > wsBriefList {
+		b.NeedsAttentionMore = len(attention) - wsBriefList
+		attention = attention[:wsBriefList]
+	}
+	for _, r := range attention {
+		b.NeedsAttention = append(b.NeedsAttention, itemOf(r))
 	}
 	sums, err := s.summaryRows(project, root, "", files)
 	if err != nil {

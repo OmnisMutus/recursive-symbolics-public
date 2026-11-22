@@ -235,3 +235,19 @@ Not covered here:
 - A summary's quality is not checked by anything. FRESH means the file is the one summarized.
 - A log that cannot be written never fails a call, so a missing log is silent: check the file exists
   before reading totals from it.
+
+### `ws_brief` attention rotation and truncation counts (2026-11-22)
+
+Ground truth: hand-built files and test records constructed in `workspace_test.go`, so which items are
+`BROKEN`, `GONE`, `MOVED`, or unresolved is known by construction. Each mutation was applied directly to
+`apis/workspace.go`, tested with `go test -count=1 -run "TestWS_Brief" ./apis/`, and restored byte-for-byte
+(verified by SHA-256 `3a05cd8cf6c87b5e288a1e107a48325e5367738daf6a500d998186bfd534362d`), followed by a
+clean `go test -count=1 -race ./...` run on Go 1.27.4, windows/amd64.
+
+| ID | Guard | Planted bug | Test that fails | Status |
+|---|---|---|---|---|
+| W50 | `needs_attention` puts newer IDs first (no starvation behind >20 old findings) | `attention[i].ID > attention[j].ID` reversed to `<` | `TestWS_BriefAttentionDoesNotStarveNewerFindings`, `TestWS_BriefAttentionPrioritizesBrokenAndGoneOverMoved` | VERIFIED |
+| W51 | `attentionRank` puts `BROKEN`/`GONE` ahead of `MOVED` | `attentionRank` always returns `0` | `TestWS_BriefAttentionPrioritizesBrokenAndGoneOverMoved` | VERIFIED |
+| W52 | `needs_attention_more` reports count omitted past 20 | `b.NeedsAttentionMore = 0` | `TestWS_BriefAttentionDoesNotStarveNewerFindings`, `TestWS_BriefAttentionPrioritizesBrokenAndGoneOverMoved` | VERIFIED |
+| W53 | `open_unknowns` puts newer IDs first | `openUnknowns[i].ID > openUnknowns[j].ID` reversed to `<` | `TestWS_BriefOpenUnknownsNewestFirstAndReportsOmitted` | VERIFIED |
+| W54 | `open_unknowns_more` reports count omitted past 20 | `b.OpenUnknownsMore = 0` | `TestWS_BriefOpenUnknownsNewestFirstAndReportsOmitted` | VERIFIED |

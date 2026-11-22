@@ -753,3 +753,137 @@ func TestWS_MCPRefusesAFractionalLine(t *testing.T) {
 		t.Fatalf("brief over MCP: %q", text)
 	}
 }
+
+func TestWS_BriefAttentionDoesNotStarveNewerFindings(t *testing.T) {
+	f := newWS(t)
+	var lines []string
+	for i := 1; i <= 25; i++ {
+		lines = append(lines, "line "+strings.Repeat("x", i%5+1)+" "+string(rune('A'+i-1)))
+	}
+	body := strings.Join(lines, "\n") + "\n"
+	writeT(t, f.root, "src/items.txt", body)
+	for i := 1; i <= 20; i++ {
+		if _, err := f.s.doRecord("demo", "finding", "c", "src/items.txt", i, i, lines[i-1], ""); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// Replace every line so findings #1..#20 are all BROKEN — exact boundary wsBriefList (20).
+	writeT(t, f.root, "src/items.txt", strings.ReplaceAll(body, "line ", "changed "))
+	raw, err := f.s.doBrief("demo")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(raw, "needs_attention_more") {
+		t.Fatalf("20 items should omit needs_attention_more: %s", raw)
+	}
+	b := f.brief(t)
+	if len(b.NeedsAttention) != 20 || b.NeedsAttentionMore != 0 {
+		t.Fatalf("20 broken: len=%d more=%d", len(b.NeedsAttention), b.NeedsAttentionMore)
+	}
+	if b.NeedsAttention[0].ID != 20 || b.NeedsAttention[19].ID != 1 {
+		t.Fatalf("20 broken order: first=%d last=%d", b.NeedsAttention[0].ID, b.NeedsAttention[19].ID)
+	}
+
+	// Restore clean lines for 21..25, record them as findings, plus one unknown (#26) that gets resolved, then break all of them.
+	writeT(t, f.root, "src/items.txt", body)
+	for i := 21; i <= 25; i++ {
+		if _, err := f.s.doRecord("demo", "finding", "c", "src/items.txt", i, i, lines[i-1], ""); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := f.s.doRecord("demo", "unknown", "q", "src/items.txt", 1, 1, lines[0], ""); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.s.doResolve("demo", 26, "answered", ""); err != nil {
+		t.Fatal(err)
+	}
+	writeT(t, f.root, "src/items.txt", strings.ReplaceAll(body, "line ", "changed "))
+
+	b = f.brief(t)
+	if b.Anchors[stateBroken] != 26 {
+		t.Fatalf("anchors[BROKEN] = %d, want 26", b.Anchors[stateBroken])
+	}
+	if len(b.NeedsAttention) != 20 || b.NeedsAttentionMore != 5 {
+		t.Fatalf("25 unresolved broken: len=%d more=%d", len(b.NeedsAttention), b.NeedsAttentionMore)
+	}
+	for i, item := range b.NeedsAttention {
+		wantID := 25 - i
+		if item.ID != wantID {
+			t.Fatalf("NeedsAttention[%d].ID = %d, want %d (newest first)", i, item.ID, wantID)
+		}
+	}
+}
+
+func TestWS_BriefAttentionPrioritizesBrokenAndGoneOverMoved(t *testing.T) {
+	f := newWS(t)
+	writeT(t, f.root, "src/a.txt", "alpha line\n")
+	writeT(t, f.root, "src/b.txt", "beta line\n")
+	if _, err := f.s.doRecord("demo", "finding", "broken old", "src/a.txt", 1, 1, "alpha line", ""); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.s.doRecord("demo", "finding", "gone old", "src/b.txt", 1, 1, "beta line", ""); err != nil {
+		t.Fatal(err)
+	}
+	var mlines []string
+	for i := 1; i <= 22; i++ {
+		mlines = append(mlines, "keep "+string(rune('a'+i-1)))
+	}
+	mbody := strings.Join(mlines, "\n") + "\n"
+	writeT(t, f.root, "src/m.txt", mbody)
+	for i := 1; i <= 22; i++ {
+		if _, err := f.s.doRecord("demo", "finding", "moved", "src/m.txt", i, i, mlines[i-1], ""); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// Make #1 BROKEN, #2 GONE, and #3..#24 MOVED by prepending one line.
+	writeT(t, f.root, "src/a.txt", "rewritten\n")
+	if err := os.Remove(filepath.Join(f.root, "src", "b.txt")); err != nil {
+		t.Fatal(err)
+	}
+	writeT(t, f.root, "src/m.txt", "header\n"+mbody)
+
+	b := f.brief(t)
+	if len(b.NeedsAttention) != 20 || b.NeedsAttentionMore != 4 {
+		t.Fatalf("len=%d more=%d", len(b.NeedsAttention), b.NeedsAttentionMore)
+	}
+	if b.NeedsAttention[0].ID != 2 || b.NeedsAttention[0].State != stateGone ||
+		b.NeedsAttention[1].ID != 1 || b.NeedsAttention[1].State != stateBroken {
+		t.Fatalf("top 2 should be GONE(#2) and BROKEN(#1): %+v", b.NeedsAttention[:2])
+	}
+	for i := 2; i < 20; i++ {
+		wantID := 24 - (i - 2)
+		if b.NeedsAttention[i].ID != wantID || b.NeedsAttention[i].State != stateMoved {
+			t.Fatalf("NeedsAttention[%d] = #%d (%s), want #%d (MOVED)", i, b.NeedsAttention[i].ID, b.NeedsAttention[i].State, wantID)
+		}
+	}
+}
+
+func TestWS_BriefOpenUnknownsNewestFirstAndReportsOmitted(t *testing.T) {
+	f := newWS(t)
+	for i := 1; i <= 21; i++ {
+		if _, err := f.s.doRecord("demo", "unknown", "q", "src/demo.go", 3, 3, "Refund caps", ""); err != nil {
+			t.Fatal(err)
+		}
+	}
+	b := f.brief(t)
+	if len(b.OpenUnknowns) != 20 || b.OpenUnknownsMore != 1 {
+		t.Fatalf("21 open unknowns: len=%d more=%d", len(b.OpenUnknowns), b.OpenUnknownsMore)
+	}
+	if b.OpenUnknowns[0].ID != 21 || b.OpenUnknowns[19].ID != 2 {
+		t.Fatalf("order: first=%d last=%d", b.OpenUnknowns[0].ID, b.OpenUnknowns[19].ID)
+	}
+	if _, err := f.s.doResolve("demo", 21, "closed", ""); err != nil {
+		t.Fatal(err)
+	}
+	raw, err := f.s.doBrief("demo")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(raw, "open_unknowns_more") {
+		t.Fatalf("20 open unknowns should omit open_unknowns_more: %s", raw)
+	}
+	b = f.brief(t)
+	if len(b.OpenUnknowns) != 20 || b.OpenUnknownsMore != 0 || b.OpenUnknowns[0].ID != 20 {
+		t.Fatalf("after resolve: len=%d more=%d first=%d", len(b.OpenUnknowns), b.OpenUnknownsMore, b.OpenUnknowns[0].ID)
+	}
+}

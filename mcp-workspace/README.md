@@ -166,7 +166,9 @@ reproduce this way.)
 
 * `ws_brief` is where a session starts, in one call: the commit and whether the
   tree is clean, the last note and how many commits came after it, the open
-  unknowns and the findings whose evidence MOVED, BROKE or is GONE, how many
+  unknowns and the findings whose evidence MOVED, BROKE or is GONE (up to 20 of
+  each, newest first, with `BROKEN` and `GONE` ahead of `MOVED`, plus
+  `open_unknowns_more` / `needs_attention_more` when more are omitted), how many
   findings are in each state, which file summaries went stale, and the results
   recorded at this commit. A finding is shown by id, place, state and the head
   of its claim (its first sentence, at most 160 bytes), so the brief stays small
