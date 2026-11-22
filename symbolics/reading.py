@@ -1,4 +1,4 @@
-"""The simple API: one call from words to a reading, with every check the layers below require.
+"""The API: one call from words to a reading, with every check the layers below require.
 
     import symbolics
     r = symbolics.read("I kept rewriting the same paragraph and felt stuck.")

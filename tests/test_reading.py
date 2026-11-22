@@ -1,4 +1,4 @@
-"""The simple API (symbolics/reading.py): symbolics.read, readings, lenses.
+"""The API (symbolics/reading.py): symbolics.read, readings, lenses.
 
 Ground truth, in the order STANDARD.md asks for it:
 

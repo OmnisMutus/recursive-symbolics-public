@@ -1,4 +1,4 @@
-# The simple API (a README written before the code)
+# The API (a README written before the code)
 
 Status: **an exercise in progress (2026-11-21), built out of curiosity, with no expected result.** This file
 was written before the code, as if the code already existed. Every output shown is what today's modules return
@@ -97,7 +97,7 @@ symbolics.read("...").type   # 'unknown' too: punctuation alone has no words in 
 ```
 
 That is a **change**. Before, empty text and punctuation got the centre address `(500, 500, 500)` and a
-reading like any other. The simple API says what is true instead: there were no words to read.
+reading like any other. The API says what is true instead: there were no words to read.
 
 A mistake in the *call* is different, and is raised at once, whatever the text:
 
@@ -141,7 +141,7 @@ symbolics.read(text)                      simple: one call, one value, prints we
   └─ ethics.emit(record)                  the gate; every simple-API return passes through it
 ```
 
-The simple API adds no path around the gate (AGENTS.md rule 2): `read`, `readings` and the refusals all go out
+The API adds no path around the gate (AGENTS.md rule 2): `read`, `readings` and the refusals all go out
 through `ethics.emit()`. A lens still never writes into an address (rule 1), and nothing new touches the
 network (rule 4). The modules underneath keep their names and behaviour, so code written against them today
 keeps working.
@@ -234,7 +234,7 @@ symbolics.check(text)
 ## Fixes underneath, found while writing this (2026-11-22)
 
 Writing the examples above meant calling the modules underneath for real, and these came up. Each one weakens
-a promise the simple API makes, so they are fixed before `check` is built.
+a promise the API makes, so they are fixed before `check` is built.
 
 | # | Where | What was wrong | The promise it weakened |
 |---|---|---|---|
@@ -260,7 +260,7 @@ a promise the simple API makes, so they are fixed before `check` is built.
 ## The same idea for agents: Vector in one call (parked until last)
 
 Today it takes three objects (`mcp.MCPServer`, `outbound.Outbound`, `vector_bridge.Bridge`) and the knowledge
-that the server must be named `"vector"`. The simple API:
+that the server must be named `"vector"`. The API:
 
 ```python
 from reference_agent import vector

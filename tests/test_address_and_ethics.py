@@ -243,7 +243,7 @@ class TestEmitGate(unittest.TestCase):
             with self.assertRaises(E.EthicsError):
                 E.emit(value)
 
-    # 2026-11-22, found while writing SIMPLE_API.md: emit read top-level strings only.
+    # 2026-11-22, found while writing API.md: emit read top-level strings only.
     def test_a_ranking_nested_anywhere_is_refused(self):
         for value in ({"type": "fact", "items": ["You are worse than others."]},
                       {"type": "fact", "detail": {"note": "a superior practitioner"}},

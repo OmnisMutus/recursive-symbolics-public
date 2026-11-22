@@ -41,7 +41,7 @@ This is a symbolic map; the territory is your lived experience.
 ```
 
 A reading says what it found, offers the alternatives, asks a question back, and always carries its caveat. A
-request about someone else is refused. [SIMPLE_API.md](SIMPLE_API.md) explains `read()` in full, and
+request about someone else is refused. [API.md](API.md) explains `read()` in full, and
 `python examples/quickstart.py` walks through the parts underneath it. `read()` is on `main`; the v0.3.0 release
 does not have it yet.
 
@@ -142,7 +142,7 @@ The project prefers a named gap to a claim of completeness.
 | Read | For |
 |---|---|
 | [ELI5.md](ELI5.md) | the whole repository in plain words |
-| [SIMPLE_API.md](SIMPLE_API.md) | `read()`, what it refuses, and why it is shaped this way |
+| [API.md](API.md) | `read()`, what it refuses, and why it is shaped this way |
 | [ASSEMBLY_GUIDE.md](ASSEMBLY_GUIDE.md) | plugging in your own parsers, rules, stores and model sandboxes |
 | [STANDARD.md](STANDARD.md) | what counts as VERIFIED, and the break-it rule |
 | [ETHICS.md](ETHICS.md) | what the engine refuses, and where each refusal lives in code |
