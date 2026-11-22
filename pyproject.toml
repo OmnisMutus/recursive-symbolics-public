@@ -39,7 +39,7 @@ dependencies = []
 Homepage = "https://github.com/OmnisMutus/recursive-symbolics-public"
 Repository = "https://github.com/OmnisMutus/recursive-symbolics-public"
 Issues = "https://github.com/OmnisMutus/recursive-symbolics-public/issues"
-Documentation = "https://github.com/OmnisMutus/recursive-symbolics-public/blob/main/ELI5.md"
+Documentation = "https://github.com/OmnisMutus/recursive-symbolics-public/blob/main/docs/ELI5.md"
 
 [project.optional-dependencies]
 engines = ["numpy>=1.24"]

@@ -30,8 +30,8 @@ people, not a claim about how the code works:
 
 | Layer | Role | Main files |
 |---|---|---|
-| Kether | Intent | `intent.json`, `AGENTS.md`, `ETHICS.md` |
-| Chokmah / Binah | Design | `symbolic_api.json`, `symbolics/interfaces.py`, `STANDARD.md`, `ASSEMBLY_GUIDE.md` |
+| Kether | Intent | `intent.json`, `AGENTS.md`, `docs/ETHICS.md` |
+| Chokmah / Binah | Design | `symbolic_api.json`, `symbolics/interfaces.py`, `STANDARD.md`, `docs/ASSEMBLY_GUIDE.md` |
 | Chesed | Expansion | `examples/algebra_simplifier.py`, `examples/propositional_reducer.py`, `symbolics/family_f.py` |
 | Geburah | Boundary | `symbolics/ethics.py`, `symbolics/conformance.py`, `reference_agent/outbound.py`, `symbolics/outgoing.py`, `engines/safe_memory_boundary_engine.py` |
 | Tiphareth | Integration | `symbolics/ledger.py`, `examples/quickstart.py` |

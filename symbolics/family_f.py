@@ -1,6 +1,6 @@
 """Family-F deterministic solver, output verification gate, and Candidate-1 Hebrew episode generator.
 
-Implements Sections 2, 3, 6, and 7 of ASSEMBLY_GUIDE.md (Dihedral Group D_22 Permutation Family) using standard-library Python only:
+Implements Sections 2, 3, 6, and 7 of docs/ASSEMBLY_GUIDE.md (Dihedral Group D_22 Permutation Family) using standard-library Python only:
 - 44 dihedral substitutions on Z_22: i -> (shift + sign * i) mod 22 (Atbash, Albam, Avgad, etc.).
 - Positional & row readings: id, reverse, rotate_1..7, notariqon_initials/finals, interleave, boustrophedon.
 - Exact rule enumeration over all 44 * 13 = 572 substitution x positional rules.

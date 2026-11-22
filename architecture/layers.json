@@ -1,6 +1,6 @@
 {
   "about": "Index mapping each layer of the Recursive Symbolics Engine Architecture to concrete files and test evidence. Checked by python -m symbolics.layers.",
-  "source_note": "ASSEMBLY_GUIDE.md & README.md",
+  "source_note": "docs/ASSEMBLY_GUIDE.md & README.md",
   "stage": {
     "current": 1,
     "name": "Collaborative Foundation",
@@ -25,7 +25,7 @@
         },
         {
           "repo": "recursive-symbolics",
-          "path": "ETHICS.md",
+          "path": "docs/ETHICS.md",
           "what": "System refusals and where each refusal lives in code."
         }
       ],
@@ -56,7 +56,7 @@
         },
         {
           "repo": "recursive-symbolics",
-          "path": "ASSEMBLY_GUIDE.md",
+          "path": "docs/ASSEMBLY_GUIDE.md",
           "what": "Developer integration contracts for custom backends and persistent stores."
         }
       ],

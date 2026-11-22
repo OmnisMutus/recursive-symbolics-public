@@ -16,7 +16,7 @@ Minds, human and artificial alike, slip in four quiet ways:
 This repository puts checks against those slips in code, where they can be tested, rather than in a prompt or a
 promise. The checks hold the person and the program alike, and neither one gets to override the other.
 
-New here? [ELI5.md](ELI5.md) explains the whole repository in plain words.
+New here? [ELI5.md](docs/ELI5.md) explains the whole repository in plain words.
 
 ## Try it
 
@@ -41,7 +41,7 @@ This is a symbolic map; the territory is your lived experience.
 ```
 
 A reading says what it found, offers the alternatives, asks a question back, and always carries its caveat. A
-request about someone else is refused. [API.md](API.md) explains `read()` in full, and
+request about someone else is refused. [API.md](docs/API.md) explains `read()` in full, and
 `python examples/quickstart.py` walks through the parts underneath it. `read()` is on `main`; the v0.3.0 release
 does not have it yet.
 
@@ -78,6 +78,7 @@ runs is RAN_ONLY, and is never called passing. [STANDARD.md](STANDARD.md) has th
 | [`reference_agent/`](reference_agent/README.md) | Honesty for an AI agent at work: every outbound tool call waits for a person's yes, and a test run gets a verdict only when its output is unambiguous |
 | [`mcp-workspace/`](mcp-workspace/README.md) | A Go MCP server: an agent's memory, stored with the exact lines it rests on and re-checked each time it is recalled |
 | [`athanor/`](athanor/README.md) | Change a local GGUF model (switch an expert off, scale a tensor) on a copy, with every change undoable |
+| [`docs/`](docs/README.md) | The guides: plain-words overview, the API, what the engine refuses, and how to plug in your own parts |
 | [`corpus/`](corpus/README.md) | Where the testing discipline was learned: 24 engines and the correspondence ledgers (needs NumPy and scikit-learn) |
 | [`architecture/`](architecture/README.md) | The machine-checked description of the project |
 
@@ -141,11 +142,11 @@ The project prefers a named gap to a claim of completeness.
 
 | Read | For |
 |---|---|
-| [ELI5.md](ELI5.md) | the whole repository in plain words |
-| [API.md](API.md) | `read()`, what it refuses, and why it is shaped this way |
-| [ASSEMBLY_GUIDE.md](ASSEMBLY_GUIDE.md) | plugging in your own parsers, rules, stores and model sandboxes |
+| [ELI5.md](docs/ELI5.md) | the whole repository in plain words |
+| [API.md](docs/API.md) | `read()`, what it refuses, and why it is shaped this way |
+| [ASSEMBLY_GUIDE.md](docs/ASSEMBLY_GUIDE.md) | plugging in your own parsers, rules, stores and model sandboxes |
 | [STANDARD.md](STANDARD.md) | what counts as VERIFIED, and the break-it rule |
-| [ETHICS.md](ETHICS.md) | what the engine refuses, and where each refusal lives in code |
+| [ETHICS.md](docs/ETHICS.md) | what the engine refuses, and where each refusal lives in code |
 | [LIBER_0.md](LIBER_0.md) | the append-only record: what was tried, what failed, what guards it now |
 | [OBSERVATIONS.md](OBSERVATIONS.md) | dated field notes, including where the project's own gates failed |
 | [CONTRIBUTING.md](CONTRIBUTING.md) and [AGENTS.md](AGENTS.md) | the rules for changing anything |

@@ -257,13 +257,13 @@ New to it? Start with `corpus/studies/README.md`. It needs NumPy (and scikit-lea
 
 | If you want to... | Read |
 |---|---|
-| run it | the Quickstart in [README.md](README.md) |
+| run it | the "Try it" section of [README.md](../README.md) |
 | plug in your own parts | [ASSEMBLY_GUIDE.md](ASSEMBLY_GUIDE.md) |
-| know what counts as proof | [STANDARD.md](STANDARD.md) |
+| know what counts as proof | [STANDARD.md](../STANDARD.md) |
 | know what it refuses | [ETHICS.md](ETHICS.md) |
-| contribute | [CONTRIBUTING.md](CONTRIBUTING.md) and [AGENTS.md](AGENTS.md) |
-| see what went wrong and how it was caught | [LIBER_0.md](LIBER_0.md) and [OBSERVATIONS.md](OBSERVATIONS.md) |
+| contribute | [CONTRIBUTING.md](../CONTRIBUTING.md) and [AGENTS.md](../AGENTS.md) |
+| see what went wrong and how it was caught | [LIBER_0.md](../LIBER_0.md) and [OBSERVATIONS.md](../OBSERVATIONS.md) |
 | explore any folder | the `README.md` inside it |
 
-The licence is the RCA Sephirotic Sovereignty License 1.1 ([LICENSE.md](LICENSE.md)): the source is open to read and
+The licence is the RCA Sephirotic Sovereignty License 1.1 ([LICENSE.md](../LICENSE.md)): the source is open to read and
 free for non-commercial use.

@@ -27,12 +27,12 @@ or UNTESTABLE. The rest are the checks that keep the repository honest about its
 
 | File | What it does |
 |---|---|
-| `reading.py` | The front door: `read(text)` runs the whole path below in one call and returns a `Record`; `readings()` reads with every lens; `lenses()` lists them. See `API.md`. |
+| `reading.py` | The front door: `read(text)` runs the whole path below in one call and returns a `Record`; `readings()` reads with every lens; `lenses()` lists them. See `docs/API.md`. |
 | `metrics.py` | The measurement layer: text in, observables out (entropy, centroid scores, latency helpers). Every address it builds says in its own derivation what the measurement cannot see. |
 | `address.py` | The address space: a three-axis point no tradition owns, and the read-only lenses that interpret one. |
 | `ethics.py` | The gate every reading passes through. `check_request()` refuses requests about a third party and the undefined `transcend` operator; `emit()` refuses a reading without its caveat, tradition, source or anchors, and any that ranks a person or commands. It matches words and patterns, not meaning: see Known Limitations in the main README. |
 | `agency.py` | The agency budget: directive strength (gamma) measured, capped at 0.85, disclosed and logged. It holds the one definition of the cap (`GAMMA_MAX`). `sovereign()` is the enforcement path: it softens, adds alternatives, and under a lower `gamma_max` withholds a reply still above it. |
-| `interfaces.py` | The abstract contracts you implement to plug in your own parts: `SymbolicBackend`, `RuleEngine`, `MemoryStore`, `ExecutionSandbox`. See `ASSEMBLY_GUIDE.md`. |
+| `interfaces.py` | The abstract contracts you implement to plug in your own parts: `SymbolicBackend`, `RuleEngine`, `MemoryStore`, `ExecutionSandbox`. See `docs/ASSEMBLY_GUIDE.md`. |
 | `family_f.py` | An exact solver over the 572 dihedral (D_22) permutations, used as independent ground truth, and a generator of few-shot cipher episodes. |
 
 ### Recording what is true
@@ -58,7 +58,7 @@ Each runs as `python -m symbolics.<name>` and exits with an error when it fails.
 
 ## Before you change anything here
 
-1. Read `STANDARD.md`, `ETHICS.md` and `AGENTS.md`.
+1. Read `STANDARD.md`, `docs/ETHICS.md` and `AGENTS.md`.
 2. Run `python -m symbolics.conformance` after any edit in this folder.
 3. A module is not VERIFIED until its tests compare against an independent ground truth, cover the edge cases,
    and pass the mutation gate with every surviving mutant reported.

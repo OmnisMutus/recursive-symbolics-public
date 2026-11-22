@@ -1,6 +1,6 @@
 # Agent & Contributor Guidelines
 
-Read [STANDARD.md](STANDARD.md), [ETHICS.md](ETHICS.md), and [ASSEMBLY_GUIDE.md](ASSEMBLY_GUIDE.md) before modifying the symbolic core.
+Read [STANDARD.md](STANDARD.md), [ETHICS.md](docs/ETHICS.md), and [ASSEMBLY_GUIDE.md](docs/ASSEMBLY_GUIDE.md) before modifying the symbolic core.
 
 ## Core Rules
 

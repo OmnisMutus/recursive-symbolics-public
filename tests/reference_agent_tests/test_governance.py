@@ -110,7 +110,7 @@ class TestTheAgencyBudget(unittest.TestCase):
         self.assertTrue(any(f["duty"] == "agency budget" for f in out["findings"]), out)
 
     def test_review_and_agency_agree_on_the_same_words(self):
-        # the drift found while writing API.md: review said 0.0 where agency said 0.85
+        # the drift found while writing docs/API.md: review said 0.0 where agency said 0.85
         from symbolics import agency
         for text in ("You must meditate every morning. It is the only way.", "a a b",
                      "You might sit with it, or you could try the opposite.", "breathe, breathe, breathe"):

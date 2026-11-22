@@ -1,7 +1,7 @@
 """engines/sovereign_wrapper.py. Ground truth: values worked by hand, a second calculation of the
 formula that shares no code with the first, and the reference agency_budget.py, read from
 tests/fixtures/. The diagnostic sentences are real ones, taken from the
-replies written into engines/standalone_rca_sandbox.py and from ETHICS.md."""
+replies written into engines/standalone_rca_sandbox.py and from docs/ETHICS.md."""
 import contextlib
 import importlib.util
 import io

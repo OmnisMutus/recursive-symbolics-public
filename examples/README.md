@@ -29,4 +29,4 @@ It prints four demos:
 
 Copy one of the two reducers, swap in your own rules, and keep the pattern: bounded depth, a measure that must
 go down (or stay level) at every step, cycle detection, and an independent check of the final answer. Then add a
-test file under `tests/`. `ASSEMBLY_GUIDE.md` has the templates.
+test file under `tests/`. `docs/ASSEMBLY_GUIDE.md` has the templates.
