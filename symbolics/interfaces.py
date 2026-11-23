@@ -242,76 +242,79 @@ class RuleEngine(ABC):
         current = self.backend.parse(expr) if isinstance(expr, str) else expr
         initial_state = self.state_of(current)
         self._validate_request(initial_state.rendered)
+        if store is not None:
+            store.put("initial", initial_state.rendered, reason="reduce_to_fixed_point.start")
 
         seen_states = {initial_state.digest}
         steps: list[RewriteStep] = []
         current_state = initial_state
-
-        if store is not None:
-            store.put("initial", initial_state.rendered, reason="reduce_to_fixed_point.start")
-
         for depth in range(1, max_depth + 1):
             next_node, rule = self.rewrite_once(current)
             if rule is None:
-                # Confirm explicit fixed-point property on canonical representation.
-                if store is not None:
-                    store.put("fixed_point", current_state.rendered, reason="converged")
-                return ConvergenceTrace(
-                    initial=initial_state.rendered,
-                    final=current_state.rendered,
-                    converged=True,
-                    depth=len(steps),
-                    steps=tuple(steps),
-                    final_expression=current,
-                    integrity_verified=store.verify_integrity() if store is not None else True,
-                )
-
+                return self._converged(initial_state, current_state, current, steps, store, reason="converged")
             next_state = self.state_of(next_node)
             if next_state.digest in seen_states:
                 raise CycleDetectedError(
                     f"Rewrite rule {rule!r} revisited already-seen state {next_state.rendered!r} at depth {depth}."
                 )
             seen_states.add(next_state.digest)
+            steps.append(self._step(depth, rule, current_state, next_state, store))
+            current, current_state = next_node, next_state
 
-            ledger_hash = ""
-            if store is not None:
-                ledger_hash = store.put(
-                    f"step:{depth}",
-                    {"rule": rule, "before": current_state.rendered, "after": next_state.rendered},
-                    reason=rule,
-                )
-
-            steps.append(
-                RewriteStep(
-                    depth=depth,
-                    rule=rule,
-                    before=current_state.rendered,
-                    after=next_state.rendered,
-                    complexity_before=current_state.complexity,
-                    complexity_after=next_state.complexity,
-                    state_hash=next_state.digest,
-                    ledger_hash=ledger_hash,
-                )
-            )
-            current = next_node
-            current_state = next_state
-
-        # Boundary check: if the node after `max_depth` steps is already a fixed point, report convergence!
-        probe_node, probe_rule = self.rewrite_once(current)
-        if probe_rule is None:
-            if store is not None:
-                store.put("fixed_point", current_state.rendered, reason="converged_at_max_depth")
-            return ConvergenceTrace(
-                initial=initial_state.rendered,
-                final=current_state.rendered,
-                converged=True,
-                depth=len(steps),
-                steps=tuple(steps),
-                final_expression=current,
-                integrity_verified=store.verify_integrity() if store is not None else True,
-            )
-
+        # The budget is spent, but the last state may already be a fixed point; one more look tells.
+        _, rule = self.rewrite_once(current)
+        if rule is None:
+            return self._converged(initial_state, current_state, current, steps, store, reason="converged_at_max_depth")
         raise RecursionLimitError(
             f"Symbolic reduction did not reach a fixed point within max_depth={max_depth}; "
-            f"next applicable rule was {probe_rule!r} on {current_state.rendered!r}."
+            f"next applicable rule was {rule!r} on {current_state.rendered!r}."
+        )
+
+    @staticmethod
+    def _step(
+        depth: int,
+        rule: str,
+        before: SymbolicState,
+        after: SymbolicState,
+        store: MemoryStore | None,
+    ) -> RewriteStep:
+        """Record one rewrite in the store, if there is one, and describe it as a ``RewriteStep``."""
+        ledger_hash = ""
+        if store is not None:
+            ledger_hash = store.put(
+                f"step:{depth}",
+                {"rule": rule, "before": before.rendered, "after": after.rendered},
+                reason=rule,
+            )
+        return RewriteStep(
+            depth=depth,
+            rule=rule,
+            before=before.rendered,
+            after=after.rendered,
+            complexity_before=before.complexity,
+            complexity_after=after.complexity,
+            state_hash=after.digest,
+            ledger_hash=ledger_hash,
+        )
+
+    @staticmethod
+    def _converged(
+        initial_state: SymbolicState,
+        final_state: SymbolicState,
+        final_node: Any,
+        steps: list[RewriteStep],
+        store: MemoryStore | None,
+        reason: str,
+    ) -> ConvergenceTrace:
+        """Record the fixed point in the store, if there is one, and return the finished trace."""
+        if store is not None:
+            store.put("fixed_point", final_state.rendered, reason=reason)
+        return ConvergenceTrace(
+            initial=initial_state.rendered,
+            final=final_state.rendered,
+            converged=True,
+            depth=len(steps),
+            steps=tuple(steps),
+            final_expression=final_node,
+            integrity_verified=store.verify_integrity() if store is not None else True,
         )
