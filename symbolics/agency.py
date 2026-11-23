@@ -33,6 +33,7 @@ import json
 import math
 import os
 import re
+from collections import Counter
 
 GAMMA_MAX = 0.85                  # licence Article 6, and agency-budget-spec.md's hard ceiling
 SOFTEN_ABOVE = 0.70              # the inherited threshold at which the humility filter rewrites
@@ -71,6 +72,7 @@ _PATH = re.compile(r"file:/+(?:[A-Za-z]:[\\/]|(?:home|Users|sessions)/)" + _PATH
 
 
 def tokenize(text):
+    """The words of a text, lower-cased, in order."""
     return _TOKEN.findall((text or "").lower())
 
 
@@ -84,15 +86,14 @@ def entropy_gamma(text):
     0, which is exactly the kind of impossible assertion a test of this function once made.
     """
     tokens = tokenize(text)
-    if not tokens or len(tokens) <= 1:
+    if len(tokens) <= 1:
         return SHORT_TEXT_GAMMA
-    freqs = {t: tokens.count(t) for t in set(tokens)}
-    total = len(tokens)
-    probs = [c / total for c in freqs.values()]
+    counts = Counter(tokens)
+    if len(counts) == 1:
+        return GAMMA_MAX                  # one word repeated: no new information at all, so the ceiling
+    probs = [c / len(tokens) for c in counts.values()]
     h = -sum(p * math.log2(p + 1e-12) for p in probs)
-    h_max = math.log2(len(probs)) if len(probs) > 1 else 1.0
-    h_norm = h / h_max if h_max > 0 else 0.0
-    return max(0.0, min(GAMMA_MAX, 1.0 - h_norm))
+    return max(0.0, min(GAMMA_MAX, 1.0 - h / math.log2(len(counts))))   # divided by the most h could be
 
 
 def form_gamma(text):
@@ -150,23 +151,22 @@ def measure(text):
     }
 
 
+def _in_same_case(replacement, match):
+    """The replacement, capitalised if the words it replaces were."""
+    if match.group(0)[:1].isupper():
+        return replacement[:1].upper() + replacement[1:]
+    return replacement
+
+
 def soften(text):
     """The inherited humility filter: rewrite the commanding forms into offered ones.
 
     The replacement keeps the case the writer used, so a rewrite at the start of a sentence still reads as one.
     The inherited version always substituted a capitalised phrase, which read oddly mid-sentence.
     """
-    def replace(replacement):
-        def apply(match):
-            found = match.group(0)
-            if found[:1].isupper():
-                return replacement[:1].upper() + replacement[1:]
-            return replacement
-        return apply
-
     out = str(text or "")
     for pattern, replacement in _SOFTEN:
-        out = pattern.sub(replace(replacement), out)
+        out = pattern.sub(functools.partial(_in_same_case, replacement), out)
     return out
 
 
@@ -201,6 +201,45 @@ ALTERNATIVES_LINE = ("Other ways to go: you might sit with it as it is, or you m
                      "what that shows. Neither is the one right move.")
 
 
+def _reply_text(out):
+    """Where a reply's text is: (the key that holds it, the text).
+
+    A dict keeps its text under "content", "why" or "text", the first that holds a string. A plain string has no
+    key. Anything else, including a dict with none of those, is measured as empty text.
+    """
+    if isinstance(out, dict):
+        for key in ("content", "why", "text"):
+            if isinstance(out.get(key), str):
+                return key, out[key]
+        return None, ""
+    return None, out if isinstance(out, str) else ""
+
+
+def _keep_to_budget(text, gamma_max, min_alternatives):
+    """Soften the text if it pushes, offer alternatives if it gives too few, and measure what is left."""
+    soften_above = min(SOFTEN_ABOVE, gamma_max)          # read at call time, so tests may move them
+    alternatives_below = min(ALTERNATIVES_BELOW, gamma_max)
+    if directive_strength(text) > soften_above:
+        text = soften(text)
+    data = measure(text)
+    if data["directive_strength"] > alternatives_below and data["alternatives_presented"] < min_alternatives:
+        text = text.rstrip() + "\n\n" + ALTERNATIVES_LINE
+        data = measure(text)
+    data["max_gamma_cap"] = gamma_max
+    return text, data
+
+
+def _withheld(text, data, gamma_max):
+    """The refusal a person gets instead of a reply that is still above their cap. The reply is kept, not sent."""
+    data["sovereignty_guarantee"] = "WITHHELD"
+    data["withheld"] = text
+    return {"type": "refusal", "principle": "agency budget (licence Article 6)",
+            "why": (f"This reply measured a directive strength of {data['directive_strength']} after "
+                    f"softening and offering alternatives, above the {gamma_max} it was asked to keep, "
+                    f"so it is withheld rather than sent."),
+            "sovereignty_metadata": data}
+
+
 def sovereign(gamma_max=GAMMA_MAX, min_alternatives=MIN_ALTERNATIVES, log=True, log_dir=None):
     """The boundary decorator. Put it on anything that answers a person, and the budget cannot be forgotten.
 
@@ -221,33 +260,13 @@ def sovereign(gamma_max=GAMMA_MAX, min_alternatives=MIN_ALTERNATIVES, log=True, 
         @functools.wraps(fn)
         def wrapper(*args, **kwargs):
             out = fn(*args, **kwargs)
-            as_dict = isinstance(out, dict)
-            key = next((k for k in ("content", "why", "text") if as_dict and isinstance(out.get(k), str)), None)
-            text = out.get(key) if key else (out if isinstance(out, str) else "")
-            if not isinstance(text, str):
-                return out
-            soften_above = min(SOFTEN_ABOVE, gamma_max)          # read at call time, so tests may move them
-            alternatives_below = min(ALTERNATIVES_BELOW, gamma_max)
-            if directive_strength(text) > soften_above:
-                text = soften(text)
-            data = measure(text)
-            if data["directive_strength"] > alternatives_below and data["alternatives_presented"] < min_alternatives:
-                text = text.rstrip() + "\n\n" + ALTERNATIVES_LINE
-                data = measure(text)
-            data["max_gamma_cap"] = gamma_max
-            if data["directive_strength"] > gamma_max:
-                data["sovereignty_guarantee"] = "WITHHELD"
-                data["withheld"] = text
-                if log:
-                    audit(data, log_dir or LOG_DIR)
-                return {"type": "refusal", "principle": "agency budget (licence Article 6)",
-                        "why": (f"This reply measured a directive strength of {data['directive_strength']} after "
-                                f"softening and offering alternatives, above the {gamma_max} it was asked to keep, "
-                                f"so it is withheld rather than sent."),
-                        "sovereignty_metadata": data}
+            key, text = _reply_text(out)
+            text, data = _keep_to_budget(text, gamma_max, min_alternatives)
             if log:
                 audit(data, log_dir or LOG_DIR)
-            if as_dict:
+            if data["directive_strength"] > gamma_max:
+                return _withheld(text, data, gamma_max)
+            if isinstance(out, dict):
                 result = dict(out)
                 if key:
                     result[key] = text
