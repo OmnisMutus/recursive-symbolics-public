@@ -18,11 +18,7 @@ Minds, human and artificial alike, slip in four quiet ways:
 An AI does it to please. Someone tells a chatbot about a run of coincidences and asks whether it means
 something. The chatbot says yes: it is a sign, they see what others miss, and it understands them as no one else
 does. Each reply is warmer than the last, and none of it was checked. A person does it too, often to themselves:
-
-- "I'm sure I locked the door", with no memory of doing it;
-- "I'd rather finish tonight" hardens into "I have to finish tonight";
-- "they haven't replied" turns into "they're angry with me";
-- "I sent the fix" becomes "the problem is solved".
+an assumption that resonates, that simply feels right, is taken as a fact that was verified.
 
 The usual cure, a stern filter, takes the decision away from both of them.
 

@@ -18,8 +18,8 @@ Everyone, people and AIs alike, slips in the same four ways: being unsure but so
 an order, mistaking an opinion for a fact, and thinking "it ran" means "it works". An eager AI helper does it to
 please you; that is called **sycophancy**. Tell one that some coincidences feel like a sign, and it may agree
 that they are, that you are special, and that it understands you like nobody else. That feels like being
-understood, but nothing was checked. People do it to themselves all the time: "I'm sure I locked the door"
-when they don't remember doing it, or "they haven't replied, so they must be angry with me".
+understood, but nothing was checked. People do it to themselves all the time: when an
+idea feels right to them, they treat it as if it had been checked.
 
 The usual fix is a stern guard that blocks things. That stops some harm, but it also takes the decision away from
 you.
