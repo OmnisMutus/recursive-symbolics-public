@@ -216,78 +216,83 @@ class PropositionalReducer(RuleEngine):
         super().__init__(backend or LogicBackend(), enforce_constitutional=enforce_constitutional)
 
     def rewrite_once(self, node: Any) -> tuple[Any, str | None]:
+        """Apply one rule, innermost first: inside a node's parts (left before right) before the node itself."""
         if isinstance(node, (BoolConst, Atom)):
             return node, None
-
         if isinstance(node, Not):
             inner, rule = self.rewrite_once(node.operand)
             if rule is not None:
                 return Not(inner), rule
-            if isinstance(inner, BoolConst):
-                return BoolConst(not inner.value), "not_const"
-            if isinstance(inner, Not):
-                return inner.operand, "double_negation_elim"
-            if isinstance(inner, And):
-                return Or(Not(inner.left), Not(inner.right)), "de_morgan_and"
-            if isinstance(inner, Or):
-                return And(Not(inner.left), Not(inner.right)), "de_morgan_or"
-            return node, None
-
-        if isinstance(node, Implies):
-            new_l, l_rule = self.rewrite_once(node.left)
-            if l_rule is not None:
-                return Implies(new_l, node.right), l_rule
-            new_r, r_rule = self.rewrite_once(node.right)
-            if r_rule is not None:
-                return Implies(node.left, new_r), r_rule
-            if isinstance(node.left, BoolConst) and node.left.value is False:
-                return BoolConst(True), "vacuous_implication"
-            if isinstance(node.left, BoolConst) and node.left.value is True:
-                return node.right, "modus_ponens_const"
-            if isinstance(node.right, BoolConst) and node.right.value is True:
-                return BoolConst(True), "tautological_consequent"
-            if node.left == node.right:
-                return BoolConst(True), "self_implication_tautology"
-            return Or(Not(node.left), node.right), "implies_elim"
-
-        if isinstance(node, And):
-            new_l, l_rule = self.rewrite_once(node.left)
-            if l_rule is not None:
-                return And(new_l, node.right), l_rule
-            new_r, r_rule = self.rewrite_once(node.right)
-            if r_rule is not None:
-                return And(node.left, new_r), r_rule
-            l, r = node.left, node.right
-            if (isinstance(l, BoolConst) and not l.value) or (isinstance(r, BoolConst) and not r.value):
-                return BoolConst(False), "and_annihilation"
-            if isinstance(l, BoolConst) and l.value:
-                return r, "and_identity_left"
-            if isinstance(r, BoolConst) and r.value:
-                return l, "and_identity_right"
-            if l == r:
-                return l, "and_idempotence"
-            if l == Not(r) or r == Not(l):
-                return BoolConst(False), "non_contradiction"
-            return node, None
-
-        if isinstance(node, Or):
-            new_l, l_rule = self.rewrite_once(node.left)
-            if l_rule is not None:
-                return Or(new_l, node.right), l_rule
-            new_r, r_rule = self.rewrite_once(node.right)
-            if r_rule is not None:
-                return Or(node.left, new_r), r_rule
-            l, r = node.left, node.right
-            if (isinstance(l, BoolConst) and l.value) or (isinstance(r, BoolConst) and r.value):
-                return BoolConst(True), "or_annihilation"
-            if isinstance(l, BoolConst) and not l.value:
-                return r, "or_identity_left"
-            if isinstance(r, BoolConst) and not r.value:
-                return l, "or_identity_right"
-            if l == r:
-                return l, "or_idempotence"
-            if l == Not(r) or r == Not(l):
-                return BoolConst(True), "excluded_middle"
-            return node, None
-
+            return self._rewrite_not(node)
+        for kind, rewrite_here in ((Implies, self._rewrite_implies), (And, self._rewrite_and), (Or, self._rewrite_or)):
+            if isinstance(node, kind):
+                inside = self._rewrite_a_side(node, kind)
+                return inside if inside is not None else rewrite_here(node)
         raise TypeError(f"Unsupported logic node: {type(node).__name__}")
+
+    def _rewrite_a_side(self, node: Any, kind: type) -> tuple[Any, str] | None:
+        """One rule applied inside the left side, or else the right; None if neither side can change."""
+        new_left, rule = self.rewrite_once(node.left)
+        if rule is not None:
+            return kind(new_left, node.right), rule
+        new_right, rule = self.rewrite_once(node.right)
+        if rule is not None:
+            return kind(node.left, new_right), rule
+        return None
+
+    @staticmethod
+    def _rewrite_not(node: Not) -> tuple[Any, str | None]:
+        inner = node.operand
+        if isinstance(inner, BoolConst):
+            return BoolConst(not inner.value), "not_const"
+        if isinstance(inner, Not):
+            return inner.operand, "double_negation_elim"
+        if isinstance(inner, And):
+            return Or(Not(inner.left), Not(inner.right)), "de_morgan_and"
+        if isinstance(inner, Or):
+            return And(Not(inner.left), Not(inner.right)), "de_morgan_or"
+        return node, None
+
+    @staticmethod
+    def _rewrite_implies(node: Implies) -> tuple[Any, str]:
+        # An implication always rewrites: if no shortcut applies, it becomes ~left | right.
+        l, r = node.left, node.right
+        if isinstance(l, BoolConst) and l.value is False:
+            return BoolConst(True), "vacuous_implication"
+        if isinstance(l, BoolConst) and l.value is True:
+            return r, "modus_ponens_const"
+        if isinstance(r, BoolConst) and r.value is True:
+            return BoolConst(True), "tautological_consequent"
+        if l == r:
+            return BoolConst(True), "self_implication_tautology"
+        return Or(Not(l), r), "implies_elim"
+
+    @staticmethod
+    def _rewrite_and(node: And) -> tuple[Any, str | None]:
+        l, r = node.left, node.right
+        if (isinstance(l, BoolConst) and not l.value) or (isinstance(r, BoolConst) and not r.value):
+            return BoolConst(False), "and_annihilation"
+        if isinstance(l, BoolConst) and l.value:
+            return r, "and_identity_left"
+        if isinstance(r, BoolConst) and r.value:
+            return l, "and_identity_right"
+        if l == r:
+            return l, "and_idempotence"
+        if l == Not(r) or r == Not(l):
+            return BoolConst(False), "non_contradiction"
+        return node, None
+
+    @staticmethod
+    def _rewrite_or(node: Or) -> tuple[Any, str | None]:
+        l, r = node.left, node.right
+        if (isinstance(l, BoolConst) and l.value) or (isinstance(r, BoolConst) and r.value):
+            return BoolConst(True), "or_annihilation"
+        if isinstance(l, BoolConst) and not l.value:
+            return r, "or_identity_left"
+        if isinstance(r, BoolConst) and not r.value:
+            return l, "or_identity_right"
+        if l == r:
+            return l, "or_idempotence"
+        if l == Not(r) or r == Not(l):
+            return BoolConst(True), "excluded_middle"
+        return node, None
