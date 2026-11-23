@@ -412,7 +412,8 @@ class TestLinksAndInterruptions(Base):
             fh.write(b"\x99\x99\x99")
         with self.assertRaises(ValueError) as e:
             workshop.journal(self.v)
-        self.assertIn("damaged", str(e.exception))
+        # It names the write that failed, so it cannot be mistaken for an undo.
+        self.assertIn(f"Change {r['id']} recovery bytes are damaged", str(e.exception))
 
     def test_torn_last_journal_line_is_repaired(self):
         """Third review, 2026-11-06: stopped while appending the journal line, so the file ends mid-record."""
@@ -855,7 +856,8 @@ class TestWorkshopGaps(Base):
     def test_redo_bytes_of_the_right_length_but_wrong_content_stop(self):
         """workshop.py:298, len != count OR sha != before: either alone is enough to stop."""
         self.interrupted_undo(b"WXYQ")
-        with self.assertRaisesRegex(ValueError, "recovery bytes are damaged"):
+        # It names the undo that failed, so it cannot be mistaken for a write.
+        with self.assertRaisesRegex(ValueError, "Undo 1 recovery bytes are damaged"):
             workshop.journal(self.v)
 
     # ---------- names, writes, undo by id ----------

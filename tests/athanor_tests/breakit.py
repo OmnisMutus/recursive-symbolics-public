@@ -44,10 +44,10 @@ BUGS = [
     # The policy changed on 2026-11-08: a partly-written change is rolled back from the undo backup instead of
     # stopping. What has to be planted now is the check that makes the rollback safe, not the old refusal.
     ("Rollback bytes used without checking them against sha_before", "athanor/workshop.py",
-     "        if len(original) != count or _sha(original) != rec[\"sha_before\"]:\n"
-     "            raise ValueError(f\"Change {rec['id']} recovery bytes are damaged. Stopped.\")",
-     "        if False:\n"
-     "            raise ValueError(f\"Change {rec['id']} recovery bytes are damaged. Stopped.\")",
+     "    if len(original) != count or _sha(original) != rec[\"sha_before\"]:\n"
+     "        raise ValueError(f\"{label} {rec['id']} recovery bytes are damaged. Stopped.\")",
+     "    if False:\n"
+     "        raise ValueError(f\"{label} {rec['id']} recovery bytes are damaged. Stopped.\")",
      "test_athanor.TestLinksAndInterruptions.test_a_damaged_backup_still_stops"),
     ("Torn last journal line left in place", "athanor/workshop.py",
      "                fh.truncate(keep)\n", "                pass\n",

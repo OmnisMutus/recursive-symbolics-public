@@ -276,13 +276,37 @@ def _repair_tail(d):
 
 
 def _recover(path):
-    """Complete or roll back an interrupted write or undo using its durable pending marker."""
+    """Finish or roll back a write or undo that was interrupted, using the pending marker it left behind.
+
+    The bytes now in the changed range tell how far it got: sha_after means the change landed and only its journal
+    entry may be missing; sha_before means it never started; anything else means it stopped partway, so the bytes
+    saved before it are put back."""
     d = _dir(path)
     mark = os.path.join(d, "pending.json")
     if not os.path.exists(mark):
         return
     with open(mark, encoding="utf-8") as fh:
         rec = json.load(fh)
+    backup = _checked_backup(path, d, rec)
+    with open(path, "rb") as fh:
+        fh.seek(rec["start"])
+        now = _sha(fh.read(rec["bytes"]))
+    if now == rec["sha_after"]:
+        _journal_recovered(path, d, rec)
+    elif now != rec["sha_before"]:
+        _put_back(path, backup, rec)
+    _remove(mark)
+    if rec.get("operation", "write") == "undo":
+        try:
+            _remove(backup)
+        except FileNotFoundError:
+            pass
+    _fsync_dir(d)
+
+
+def _checked_backup(path, d, rec):
+    """Check a pending record before acting on it, and return the file holding the bytes from before the change:
+    undo/<id>.bin for a write, undo/<id>.redo.bin for an undo."""
     if not isinstance(rec, dict) or type(rec.get("id")) is not int or rec["id"] < 1:
         raise ValueError("The pending change record has an invalid id. Stopped.")
     start, count = rec.get("start"), rec.get("bytes")
@@ -291,68 +315,55 @@ def _recover(path):
     operation = rec.get("operation", "write")
     if operation not in ("write", "undo"):
         raise ValueError("The pending change record has an unknown operation. Stopped.")
-    undo_path = redo_path = None
     if operation == "undo":
         expected_redo = f"{rec['id']}.redo.bin"
         if rec.get("redo") != expected_redo:
             raise ValueError("Unsafe undo recovery path.")
-        redo_path = _undo_path(d, expected_redo)
+        backup = _undo_path(d, expected_redo)
     else:
-        undo_path = _undo_path(d, f"{rec['id']}.bin")
+        backup = _undo_path(d, f"{rec['id']}.bin")
     info = gguf.read(path)
     gguf.validate_edit_layout(info)
-    end = start + count
-    if not any(info["data_start"] + t["offset"] <= start and
-               end <= info["data_start"] + t["offset"] + t["bytes"] for t in info["tensors"]):
+    if _tensor_holding(info, start, start + count) is None:
         raise ValueError("The pending change range is not inside one known tensor. Stopped.")
-    with open(path, "rb") as fh:
+    return backup
+
+
+def _journal_recovered(path, d, rec):
+    """The change landed; make the journal say so. A write gets its row if missing; an undo marks its row undone."""
+    rows = _repair_tail(d)
+    if rec.get("operation", "write") == "undo":
+        row = next((r for r in rows if r["id"] == rec["id"]), None)
+        if row is None:
+            raise ValueError(f"Undo {rec['id']} completed but its journal row is missing. Stopped.")
+        row["undone"] = True
+        _rewrite(path, rows)
+    elif rec["id"] not in [r["id"] for r in rows]:
+        with open(os.path.join(d, "journal.jsonl"), "a", encoding="utf-8") as fh:
+            fh.write(json.dumps(dict(rec, what=rec["what"] + " (recovered after an interruption)")) + "\n")
+            fh.flush()
+            os.fsync(fh.fileno())
+
+
+def _put_back(path, backup, rec):
+    """The change stopped partway; write back the bytes saved before it, after checking they are the right ones."""
+    start, count = rec["start"], rec["bytes"]
+    label = "Undo" if rec.get("operation", "write") == "undo" else "Change"
+    with open(backup, "rb") as fh:
+        original = fh.read()
+    if len(original) != count or _sha(original) != rec["sha_before"]:
+        raise ValueError(f"{label} {rec['id']} recovery bytes are damaged. Stopped.")
+    with open(path, "r+b") as fh:
         fh.seek(start)
-        cur = _sha(fh.read(count))
-    if cur == rec["sha_after"]:
-        rows = _repair_tail(d)
-        if operation == "undo":
-            row = next((r for r in rows if r["id"] == rec["id"]), None)
-            if row is None:
-                raise ValueError(f"Undo {rec['id']} completed but its journal row is missing. Stopped.")
-            row["undone"] = True
-            _rewrite(path, rows)
-        elif rec["id"] not in [r["id"] for r in rows]:
-            with open(os.path.join(d, "journal.jsonl"), "a", encoding="utf-8") as fh:
-                fh.write(json.dumps(dict(rec, what=rec["what"] + " (recovered after an interruption)")) + "\n")
-                fh.flush()
-                os.fsync(fh.fileno())
-    elif cur == rec["sha_before"]:
-        pass
-    elif operation == "undo":
-        assert redo_path is not None
-        with open(redo_path, "rb") as fh:
-            original = fh.read()
-        if len(original) != count or _sha(original) != rec["sha_before"]:
-            raise ValueError(f"Undo {rec['id']} recovery bytes are damaged. Stopped.")
-        with open(path, "r+b") as fh:
-            fh.seek(start)
-            fh.write(original)
-            fh.flush()
-            os.fsync(fh.fileno())
-    else:
-        assert undo_path is not None
-        with open(undo_path, "rb") as fh:
-            original = fh.read()
-        if len(original) != count or _sha(original) != rec["sha_before"]:
-            raise ValueError(f"Change {rec['id']} recovery bytes are damaged. Stopped.")
-        with open(path, "r+b") as fh:
-            fh.seek(start)
-            fh.write(original)
-            fh.flush()
-            os.fsync(fh.fileno())
-    _remove(mark)
-    if operation == "undo":
-        assert redo_path is not None
-        try:
-            _remove(redo_path)
-        except FileNotFoundError:
-            pass
-    _fsync_dir(d)
+        fh.write(original)
+        fh.flush()
+        os.fsync(fh.fileno())
+
+
+def _tensor_holding(info, start, end):
+    """The one tensor whose data holds bytes start..end, or None if no single tensor does."""
+    return next((t for t in info["tensors"] if info["data_start"] + t["offset"] <= start
+                 and end <= info["data_start"] + t["offset"] + t["bytes"]), None)
 
 
 def journal(path):
@@ -375,8 +386,7 @@ def write(path, start, new, what, info=None):
     info = info or gguf.read(path)
     gguf.validate_edit_layout(info)
     end = start + len(new)
-    owner = next((t for t in info["tensors"] if info["data_start"] + t["offset"] <= start
-                  and end <= info["data_start"] + t["offset"] + t["bytes"]), None)
+    owner = _tensor_holding(info, start, end)
     if owner is None:
         raise PermissionError("Refused: the write isn't inside one tensor's data (header, metadata and gaps are never written).")
     with open(path, "r+b") as fh:
