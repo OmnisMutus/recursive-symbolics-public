@@ -154,6 +154,58 @@ def _test_modules(test_mod) -> List[str]:
     return mods
 
 
+def _mutant_source(tree: ast.Module, index: int, limit: int) -> Tuple[int, str, str]:
+    """The source of mutant number `index`: (its line, what was swapped, the mutated code).
+
+    Each mutant starts from a fresh copy of the tree, so no swap is ever left over from the one before.
+    """
+    copied = copy.deepcopy(tree)
+    lineno, desc, node, kind = collect_mutants(copied, limit=limit)[index]
+    if kind.startswith("cmp:"):
+        i = int(kind.split(":", 1)[1])
+        node.ops[i] = CMP_SWAPS[type(node.ops[i])]()
+    elif kind == "bin":
+        node.op = BIN_SWAPS[type(node.op)]()
+    elif kind == "boolop":
+        node.op = ast.Or() if isinstance(node.op, ast.And) else ast.And()
+    return lineno, desc, ast.unparse(copied)
+
+
+# No .pyc anywhere in the sandbox, child processes included (fixed 2026-11-22, found in an outside review). -B
+# covers only the first process; a test that starts `python` without -B wrote a .pyc, and a .pyc is trusted when
+# the source has the same size and the same mtime second. A one-character swap keeps the size, so the next mutant
+# could run the previous mutant's code: false survivors and false kills both.
+def _run_tests(sandbox_root: Path, test_mods: List[str], timeout: int, *extra: str):
+    return subprocess.run(
+        [sys.executable, "-B", "-m", "unittest", *test_mods, *extra],
+        cwd=str(sandbox_root),
+        capture_output=True,
+        encoding="utf-8", errors="replace",     # test output can hold Hebrew; the Windows codepage cannot
+        timeout=timeout,
+        env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"},
+    )
+
+
+def _receipt(relpath: str, test_mods: List[str], root: Path, module_bytes: bytes, total: int, outcome: dict) -> dict:
+    """The result, with SHA-256 fingerprints of the module, its tests, and the result itself."""
+    test_paths = [_test_module_path(root, m) for m in test_mods]
+    test_sha = _sha256_bytes(b"".join(p.read_bytes() for p in test_paths)) if all(test_paths) else None
+    result = {
+        "module": relpath,
+        "test_module": test_mods[0] if len(test_mods) == 1 else " ".join(test_mods),
+        "killed": outcome["killed"],
+        "total": total,
+        "survivors": outcome["survivors"],
+        "exempted": outcome["exempted"],
+        "timeouts": outcome["timeouts"],
+        "errors": outcome["errors"],
+        "module_sha256": _sha256_bytes(module_bytes),
+        "test_sha256": test_sha,
+    }
+    result["receipt_sha256"] = _sha256_bytes(json.dumps(result, sort_keys=True).encode("utf-8"))
+    return result
+
+
 def mutate_module(
     relpath: str,
     test_mod,
@@ -163,124 +215,53 @@ def mutate_module(
     timeout: int = 8,
     exemptions: Optional[set[str]] = None,
 ) -> dict:
-    """Run automated AST mutation testing on an isolated temporary copy and return results + SHA-256 receipt."""
-    test_mods = _test_modules(test_mod)
-    orig_path = root / relpath
-    orig_bytes = orig_path.read_bytes()
-    orig_text = orig_bytes.decode("utf-8")
-    tree = ast.parse(orig_text)
-    specs = collect_mutants(tree, limit=limit)
-    exempt = exemptions or set()
+    """Run automated AST mutation testing on an isolated temporary copy and return results + SHA-256 receipt.
 
-    killed = 0
-    timeouts: List[str] = []
-    errors: List[str] = []
-    survivors: List[str] = []
-    exempted: List[str] = []
+    The steps: copy the repository somewhere temporary, check the tests pass on the unchanged code, then for each
+    mutant write it over the copy, run the tests, sort the outcome, and put the original back.
+    """
+    test_mods = _test_modules(test_mod)
+    module_bytes = (root / relpath).read_bytes()
+    tree = ast.parse(module_bytes.decode("utf-8"))
+    total = len(collect_mutants(tree, limit=limit))
+    exempt = exemptions or set()
+    outcome = {"killed": 0, "survivors": [], "exempted": [], "timeouts": [], "errors": []}
 
     with tempfile.TemporaryDirectory() as tmp:
         sandbox_root = Path(tmp) / "repo"
         _copy_workspace(root, sandbox_root)
         sandbox_file = sandbox_root / relpath
-        # Ensure writable inside temp sandbox even if original file is read-only.
-        sandbox_file.chmod(0o644)
-        # No .pyc anywhere in the sandbox, child processes included (fixed 2026-11-22, found in an outside review). -B covers
-        # only the first process; a test that starts `python` without -B wrote a .pyc, and a .pyc is trusted when
-        # the source has the same size and the same mtime second. A one-character swap keeps the size, so the next
-        # mutant could run the previous mutant's code: false survivors and false kills both.
-        no_bytecode = {**os.environ, "PYTHONDONTWRITEBYTECODE": "1"}
+        sandbox_file.chmod(0o644)            # writable in the copy, even if the original is read-only
 
-        baseline = subprocess.run(
-            [sys.executable, "-B", "-m", "unittest", *test_mods],
-            cwd=str(sandbox_root),
-            capture_output=True,
-            encoding="utf-8", errors="replace",     # test output can hold Hebrew; the Windows codepage cannot
-            timeout=max(timeout, 15),
-            env=no_bytecode,
-        )
+        baseline = _run_tests(sandbox_root, test_mods, max(timeout, 15))
         if baseline.returncode != 0:
             raise BaselineFailure(
                 f"Baseline tests failed for {' '.join(test_mods)} (rc={baseline.returncode}):\n"
                 f"{(baseline.stdout + baseline.stderr).strip()}"
             )
 
-        sandbox_orig_bytes = sandbox_file.read_bytes()
-        for idx in range(len(specs)):
-            m_tree = copy.deepcopy(tree)
-            m_specs = collect_mutants(m_tree, limit=limit)
-            lineno, desc, target_node, kind = m_specs[idx]
-            if kind.startswith("cmp:"):
-                i = int(kind.split(":", 1)[1])
-                target_node.ops[i] = CMP_SWAPS[type(target_node.ops[i])]()
-            elif kind == "bin":
-                target_node.op = BIN_SWAPS[type(target_node.op)]()
-            elif kind == "boolop":
-                target_node.op = ast.Or() if isinstance(target_node.op, ast.And) else ast.And()
-
-            mutated_src = ast.unparse(m_tree)
+        unchanged = sandbox_file.read_bytes()
+        for index in range(total):
+            lineno, desc, source = _mutant_source(tree, index, limit)
             label = f"{relpath}:{lineno} ({desc})"
             try:
-                sandbox_file.write_text(mutated_src, encoding="utf-8", newline="\n")
+                sandbox_file.write_text(source, encoding="utf-8", newline="\n")
                 try:
-                    res = subprocess.run(
-                        [sys.executable, "-B", "-m", "unittest", *test_mods, "--failfast"],
-                        cwd=str(sandbox_root),
-                        capture_output=True,
-                        encoding="utf-8", errors="replace",
-                        timeout=timeout,
-                        env=no_bytecode,
-                    )
-                    if res.returncode == 0:
-                        if label in exempt:
-                            exempted.append(label)
-                        else:
-                            survivors.append(label)
-                    elif res.returncode == 2:
-                        errors.append(f"{label}: runner usage error")
-                    else:
-                        killed += 1
+                    returncode = _run_tests(sandbox_root, test_mods, timeout, "--failfast").returncode
                 except subprocess.TimeoutExpired:
-                    timeouts.append(label)
-                    killed += 1
+                    outcome["timeouts"].append(label)
+                    outcome["killed"] += 1            # a mutant that hangs the tests has been noticed
+                    continue
+                if returncode == 0:                   # the tests passed with the bug in: it survived
+                    outcome["exempted" if label in exempt else "survivors"].append(label)
+                elif returncode == 2:
+                    outcome["errors"].append(f"{label}: runner usage error")
+                else:
+                    outcome["killed"] += 1
             finally:
-                sandbox_file.write_bytes(sandbox_orig_bytes)
+                sandbox_file.write_bytes(unchanged)
 
-    test_paths = [_test_module_path(root, m) for m in test_mods]
-    if all(test_paths):
-        test_sha = _sha256_bytes(b"".join(p.read_bytes() for p in test_paths))
-    else:
-        test_sha = None
-    test_label = test_mods[0] if len(test_mods) == 1 else " ".join(test_mods)
-    mod_sha = _sha256_bytes(orig_bytes)
-    receipt_payload = json.dumps(
-        {
-            "module": relpath,
-            "module_sha256": mod_sha,
-            "test_module": test_label,
-            "test_sha256": test_sha,
-            "killed": killed,
-            "total": len(specs),
-            "survivors": survivors,
-            "exempted": exempted,
-            "timeouts": timeouts,
-            "errors": errors,
-        },
-        sort_keys=True,
-    ).encode("utf-8")
-
-    return {
-        "module": relpath,
-        "test_module": test_label,
-        "killed": killed,
-        "total": len(specs),
-        "survivors": survivors,
-        "exempted": exempted,
-        "timeouts": timeouts,
-        "errors": errors,
-        "module_sha256": mod_sha,
-        "test_sha256": test_sha,
-        "receipt_sha256": _sha256_bytes(receipt_payload),
-    }
+    return _receipt(relpath, test_mods, root, module_bytes, total, outcome)
 
 
 def main(argv: Optional[List[str]] = None) -> int:
