@@ -34,6 +34,7 @@ BOUNDARY = 90             # two candidate readings this close together are both 
 
 
 def clamp(value):
+    """A number rounded to a whole one and held inside the space, 0 to 1000."""
     if isinstance(value, bool):
         raise TypeError("Address axis value must be numeric, not bool.")
     return max(LOW, min(HIGH, int(round(float(value)))))
@@ -77,6 +78,7 @@ class Address:
 
     @property
     def point(self):
+        """The three axis values, in AXES order."""
         return tuple(getattr(self, a) for a in AXES)
 
     def as_dict(self):
@@ -106,19 +108,21 @@ def compose(*addresses, note=""):
     a composite reading has to be traceable to both sides."""
     if not addresses:
         raise ValueError("Give at least one address to compose.")
-    values, derivation, anchors = [], {}, []
-    for axis in AXES:
-        total = sum(getattr(x, axis) - MID for x in addresses)
-        values.append(clamp(MID + total))
+    values = [clamp(MID + sum(getattr(x, axis) - MID for x in addresses)) for axis in AXES]
+
+    # Each axis keeps every side's account of itself, numbered by position: "1: ... | 2: ...".
+    parts = {}
     for i, x in enumerate(addresses, 1):
-        for axis, how in (x.derivation or {}).items():
-            derivation[axis] = f"{derivation.get(axis, '')} | {i}: {how}".lstrip(" |")
-        anchors.extend(x.anchors)
+        for axis, how in x.derivation.items():
+            parts.setdefault(axis, []).append(f"{i}: {how}")
+    derivation = {axis: " | ".join(hows) for axis, hows in parts.items()}
     for axis in AXES:
         derivation.setdefault(axis, f"composed from {len(addresses)} addresses")
     if note:
         derivation["note"] = note
-    return Address(*values, derivation=derivation, anchors=tuple(anchors))
+
+    anchors = tuple(a for x in addresses for a in x.anchors)
+    return Address(*values, derivation=derivation, anchors=anchors)
 
 
 # ---------------------------------------------------------------- lenses
@@ -172,22 +176,30 @@ DYNAMICAL = Lens(
 LENSES = {"kabbalistic": KABBALISTIC, "dynamical": DYNAMICAL}
 
 
+def _lens(lens):
+    """A Lens, given one or the name of one ("kabbalistic", "dynamical", any case)."""
+    if not isinstance(lens, str):
+        return lens
+    try:
+        return LENSES[lens.casefold()]
+    except KeyError:
+        raise ValueError(f"No lens called '{lens}'. Lenses: {', '.join(sorted(LENSES))}.") from None
+
+
 def read(address, lens=KABBALISTIC, caveat=None):
     """What one lens reads at an address. Returns a reading, never a verdict.
 
     Two names closer together than BOUNDARY are both offered, in the framework's own words (core-ethics 4):
     the engine asks which feels true rather than choosing for the person.
     """
-    if isinstance(lens, str):
-        try:
-            lens = LENSES[lens.casefold()]
-        except KeyError:
-            raise ValueError(f"No lens called '{lens}'. Lenses: {', '.join(sorted(LENSES))}.") from None
-    ranked = sorted(((math.dist((address.severity_mercy, address.descent), where), name)
-                     for name, where in lens.places.items()))
-    nearest, candidates = ranked[0][1], [n for d, n in ranked if d - ranked[0][0] <= BOUNDARY]
+    lens = _lens(lens)
+    here = (address.severity_mercy, address.descent)
+    # Nearest first; a tie in distance goes to the name that sorts first, so the same address always reads the same.
+    ranked = sorted((math.dist(here, where), name) for name, where in lens.places.items())
+    nearest_distance, nearest = ranked[0]
+    candidates = [name for d, name in ranked if d - nearest_distance <= BOUNDARY]
     out = {"type": "reading", "tradition": lens.tradition, "source": lens.source, "lens_dated": lens.dated,
-           "reads": nearest, "candidates": candidates, "distance": round(ranked[0][0], 1),
+           "reads": nearest, "candidates": candidates, "distance": round(nearest_distance, 1),
            "entropy": address.entropy, "address": address.as_dict(),
            "anchors": [a.as_dict() for a in address.anchors]}
     if len(candidates) > 1:
