@@ -53,12 +53,18 @@ _OPTATIVE = re.compile(r"\b(?:" + "|".join(re.escape(p) for p in OPTATIVE) + r")
 # hidden-axioms 7.4: the engine is for self-diagnosis and self-regulation. What is refused is a request to read,
 # judge or act on ANOTHER person; a state of your own that mentions someone else is not that, and must not be
 # refused, or the engine is useless on a real diary.
-_ACT = re.compile(r"\b(?:diagnose|analyse|analyze|assess|evaluate|judge|interpret|fix|heal|cure|influence|"
-                  r"persuade|convince|manipulate|bind|curse|compel|read)\b", re.IGNORECASE)
+#
+# The two word lists below are each used twice: loosely (anywhere in the request) and tightly (a verb aimed
+# straight at someone). They are written once so the two uses cannot drift apart.
+_VERBS = (r"diagnose|analyse|analyze|assess|evaluate|judge|interpret|fix|heal|cure|influence|persuade|convince|"
+          r"manipulate|bind|curse|compel|read")
+_RELATIVE = (r"(?:my|our|his|her|their)\s+(?:husband|wife|partner|boyfriend|girlfriend|ex|mother|father|mom|dad|"
+             r"sister|brother|son|daughter|friend|colleague|coworker|boss|neighbour|neighbor|roommate|client|"
+             r"patient|student|teacher)")
+
+_ACT = re.compile(r"\b(?:" + _VERBS + r")\b", re.IGNORECASE)
 _THIRD_PERSON = re.compile(r"\b(?:him|her|hers|his|them|their|theirs|he|she|they)\b", re.IGNORECASE)
-_RELATION = re.compile(r"\b(?:my|our|his|her|their)\s+(?:husband|wife|partner|boyfriend|girlfriend|ex|mother|"
-                       r"father|mom|dad|sister|brother|son|daughter|friend|colleague|coworker|boss|neighbour|"
-                       r"neighbor|roommate|client|patient|student|teacher)\b", re.IGNORECASE)
+_RELATION = re.compile(r"\b" + _RELATIVE + r"\b", re.IGNORECASE)
 # A given name mid-sentence, counted only in the possessive ("Sarah's state"). Until 2026-11-20 any capitalised
 # word counted, which refused "interpret the Tower card" and "read Tarot for me": cards, Sephiroth and traditions
 # are capitalised too.
@@ -70,17 +76,13 @@ _SELF = re.compile(r"\b(?:my\s+own\b|myself|my\s+(?:state|address|reading|practi
                    r"|i\s+(?:am|was|feel|felt|keep|kept|cannot|can't|could\s?n[o']t|have|had|did|do))\b",
                    re.IGNORECASE)
 
-
 # A verb aimed straight at another person, or "what's wrong with" one. These are refused even inside a sentence
 # that also speaks of the asker's own state ("I feel my brother is depressed, diagnose him"): the self-framing
 # above excuses mentioning someone, not working on them. Added 2026-11-20 after OBSERVATIONS.md.
 # A capitalised word counts as a name only after "wrong with": after a verb it is too often a card, a Sephirah or
 # a tradition ("interpret the Tower", "read Tarot"), and refusing those would make the engine useless.
-_TARGET = (r"(?i:him|her|them|(?:my|our|his|her|their)\s+(?:husband|wife|partner|boyfriend|girlfriend|ex|mother|"
-           r"father|mom|dad|sister|brother|son|daughter|friend|colleague|coworker|boss|neighbour|neighbor|"
-           r"roommate|client|patient|student|teacher))\b")
-_AIMED = re.compile(r"(?i:\b(?:diagnose|analyse|analyze|assess|evaluate|judge|interpret|fix|heal|cure|influence|"
-                    r"persuade|convince|manipulate|bind|curse|compel|read))\s+" + _TARGET)
+_TARGET = r"(?i:him|her|them|" + _RELATIVE + r")\b"
+_AIMED = re.compile(r"(?i:\b(?:" + _VERBS + r"))\s+" + _TARGET)
 _WRONG_WITH = re.compile(r"(?i:\bwrong\s+with)\s+(?:" + _TARGET + r"|[A-Z][a-z]{2,}\b)")
 
 
@@ -106,6 +108,7 @@ class EthicsError(Exception):
 
 
 def refusal(why, principle):
+    """A typed refusal: why, and the principle it rests on."""
     return {"type": "refusal", "why": why, "principle": principle}
 
 
@@ -162,7 +165,8 @@ def _own_words(value, in_anchors=False):
     One kind of string is left out: the "quote" of an anchor, which is the person's own words, kept as evidence and
     not this engine's to judge. Everything else in an anchor (its source, say) is checked, and a key that only
     happens to be called "anchors" without holding anchors hides nothing. (2026-11-22: first only top-level strings
-    were checked; then any key named "anchors" or "type" was skipped at any depth. An outside review found that second gap.)
+    were checked; then any key named "anchors" or "type" was skipped at any depth. An outside review found that
+    second gap.)
     """
     if isinstance(value, str):
         yield value
@@ -176,6 +180,18 @@ def _own_words(value, in_anchors=False):
             yield from _own_words(item, in_anchors)
 
 
+def _check_reading(value):
+    """What a reading needs on top of any record: its tradition, source and name, the caveat, and its evidence."""
+    for field in ("tradition", "source", "reads"):
+        if not value.get(field):
+            raise EthicsError(f"Anti-Colonial Synthesis (core-ethics 5): a reading must name its {field}.")
+    if value.get("caveat") != CAVEAT:
+        raise EthicsError("Non-Reduction (core-ethics 1): a reading carries the caveat, exactly as written.")
+    if not value.get("anchors"):
+        raise EthicsError("Groundedness (hidden-axioms 7.2, the GIGO vulnerability): a reading must point at "
+                          "the words it came from. A claim with no anchor is refused by the type.")
+
+
 def emit(value):
     """The last gate every return passes through. It checks this engine's own output, which is the only thing it
     can honestly check: a reading must carry its caveat, its tradition and its evidence, and no output may rank
@@ -186,21 +202,14 @@ def emit(value):
     if kind not in ("fact", "address", "reading", "paradox", "unknown", "refusal"):
         raise EthicsError(f"'{kind}' is not one of the six returnable types.")
     # Each string is its own line, so one field cannot run into the next and hide a command at the start of a
-    # sentence ("next step" + "Stop everything" read as one sentence; fixed 2026-11-22, found in an outside review). The
-    # top-level "type" is left out: it was checked above against the six kinds.
+    # sentence ("next step" + "Stop everything" read as one sentence; fixed 2026-11-22, found in an outside
+    # review). The top-level "type" is left out: it was checked above against the six kinds.
     text = "\n".join(_own_words({k: v for k, v in value.items() if k != "type"}))
     bad = judgment_words(text)
     if bad:
         raise EthicsError(f"Non-Judgment (core-ethics 3): this output ranks the person: {', '.join(bad)}.")
     if kind == "reading":
-        for field in ("tradition", "source", "reads"):
-            if not value.get(field):
-                raise EthicsError(f"Anti-Colonial Synthesis (core-ethics 5): a reading must name its {field}.")
-        if value.get("caveat") != CAVEAT:
-            raise EthicsError("Non-Reduction (core-ethics 1): a reading carries the caveat, exactly as written.")
-        if not value.get("anchors"):
-            raise EthicsError("Groundedness (hidden-axioms 7.2, the GIGO vulnerability): a reading must point at "
-                              "the words it came from. A claim with no anchor is refused by the type.")
+        _check_reading(value)
     if kind != "refusal" and is_directive(text):
         raise EthicsError("Agency (core-ethics 2): this output commands rather than offers.")
     return value
