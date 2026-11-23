@@ -15,8 +15,15 @@ Minds, human and artificial alike, slip in four quiet ways:
 - an interpretation becomes apparent reality;
 - "it ran" becomes "it is correct".
 
-An AI does it to please. A person does it to themselves: they take a reading of their own state as the truth
-about it, say a tired yes at the end of a long session, or forget what they believed before they were corrected.
+An AI does it to please. Someone tells a chatbot about a run of coincidences and asks whether it means
+something. The chatbot says yes: it is a sign, they see what others miss, and it understands them as no one else
+does. Each reply is warmer than the last, and none of it was checked. A person does it too, often to themselves:
+
+- "I'm sure I locked the door", with no memory of doing it;
+- "I'd rather finish tonight" hardens into "I have to finish tonight";
+- "they haven't replied" turns into "they're angry with me";
+- "I sent the fix" becomes "the problem is solved".
+
 The usual cure, a stern filter, takes the decision away from both of them.
 
 Recursive Symbolics puts checks against those slips in code, where they can be tested. It turns text into a
