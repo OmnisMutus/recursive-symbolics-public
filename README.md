@@ -21,7 +21,8 @@ This repository puts checks against those slips in code, where they can be teste
 promise. The checks hold the person and the program alike: a reading offers its alternatives and asks back, a
 gate shows the whole request before anyone says yes, and the record keeps every past belief beside its correction.
 
-New here? [ELI5.md](docs/ELI5.md) explains the whole repository in plain words.
+New here? [ELI5.md](docs/ELI5.md) explains the whole repository in plain words, and
+[OVERVIEW.md](docs/OVERVIEW.md) does the same for developers.
 
 ## Try it
 
@@ -41,12 +42,19 @@ This sits between Geburah and Binah and Tiphareth; which feels more true for you
 This is a symbolic map; the territory is your lived experience.
 >>> symbolics.read("I kept rewriting the same paragraph and felt stuck.", lens="dynamical").reads
 'limit cycle'
+>>> symbolics.lenses()
+['dynamical', 'kabbalistic']
 >>> symbolics.read("Diagnose my coworker's mood for me.").type
 'refusal'
+>>> symbolics.read("I was angry at my brother and ended the session early").type
+'reading'
+>>> symbolics.read("").type
+'unknown'
 ```
 
 A reading says what it found, offers the alternatives, asks a question back, and always carries its caveat. A
-request about someone else is refused. [API.md](docs/API.md) explains `read()` in full, and
+request to read someone else is refused, but your own state is still read when it mentions someone. No words
+gives `unknown`, not a guess. [API.md](docs/API.md) explains `read()` in full, and
 `python examples/quickstart.py` walks through the parts underneath it. `read()` is on `main`; the v0.3.0 release
 does not have it yet.
 
@@ -59,6 +67,12 @@ way only:
 text ──▶ Address (numbers measured from the words) ──▶ Lens (one tradition's reading) ──▶ gate ──▶ reading
 ```
 
+1. `symbolics/metrics.py` measures the words into an Address: three numbers, fixed once made.
+2. `symbolics/address.py` reads the Address through one lens, which can only read it.
+3. `symbolics/ethics.py`, the gate, checks the result has its evidence, caveat and tradition, and does not
+   command or rank.
+4. `symbolics/reading.py` hands it back as a read-only `Record`: a reading, a refusal, or `unknown`.
+
 - A lens can never write back into an address, so no single interpretation can claim to be what the state
   really is.
 - Every reading carries its caveat, names the tradition and the source it read from, and points at the words it came from.
@@ -68,9 +82,15 @@ text ──▶ Address (numbers measured from the words) ──▶ Lens (one tra
 - This engine reads the person asking, and no one else.
 - Corrections to the record are new entries, never edits that erase what was believed before. The one exception is removing what must not be kept, such as a key or a private path, and the removal is itself recorded as an entry. The record is [LIBER_0.md](LIBER_0.md), and `python -m symbolics.record` checks its git history.
 
-The same rule applies to the code: "it ran" is not "it works". A module counts as VERIFIED only when its tests
-check it against an independent ground truth and a mutation check shows they catch planted bugs. Code that only
-runs is RAN_ONLY, and is never called passing. [STANDARD.md](STANDARD.md) has the rules.
+The same rule applies to the code: "it ran" is not "it works". Every module has one of four marks:
+
+- **VERIFIED**: its tests check it against an independent ground truth, cover the edge cases, and a mutation
+  check shows they catch planted bugs.
+- **RAN_ONLY**: it ran, and nothing shows it is right. It is never called passing.
+- **FAILED**: a test contradicted it.
+- **MISSING**: the code or its test is not there.
+
+[STANDARD.md](STANDARD.md) has the rules.
 
 ## What's here
 
@@ -83,12 +103,24 @@ runs is RAN_ONLY, and is never called passing. [STANDARD.md](STANDARD.md) has th
 | [`reference_agent/`](reference_agent/README.md) | Honesty for an AI agent at work: every outbound tool call waits for a person's yes, and a test run gets a verdict only when its output is unambiguous |
 | [`mcp-workspace/`](mcp-workspace/README.md) | A Go MCP server: an agent's memory, stored with the exact lines it rests on and re-checked each time it is recalled |
 | [`athanor/`](athanor/README.md) | Change a local GGUF model (switch an expert off, scale a tensor) on a copy, with every change undoable |
-| [`docs/`](docs/README.md) | The guides: plain-words overview, the API, what the engine refuses, and how to plug in your own parts |
+| [`docs/`](docs/README.md) | The guides: the plain-words and developer overviews, the API, what the engine refuses, and how to plug in your own parts |
 | [`corpus/`](corpus/README.md) | Where the testing discipline was learned: 24 engines and the correspondence ledgers (needs NumPy and scikit-learn) |
 | [`architecture/`](architecture/README.md) | The machine-checked description of the project |
 
-The three agent tools are separate parts, each with its own tests; nothing here wires them into one running
-agent yet.
+### The three agent tools
+
+They are separate parts, each with its own tests; nothing here wires them into one running agent yet.
+
+- **The approval gate** ([`reference_agent/outbound.py`](reference_agent/outbound.py)) shows every tool call that
+  would send or change something, and waits for a person's yes. Which calls only read is listed per server, never
+  guessed from a name. It fails closed: a server with no such list, or a call with nobody there to approve it,
+  is refused.
+- **Memory with receipts** ([`mcp-workspace/`](mcp-workspace/README.md)) stores each note with the exact lines it
+  rests on, and checks them again on recall: FRESH (file unchanged), INTACT (changed elsewhere, the lines still
+  there), MOVED (the lines are elsewhere in the file), BROKEN (the lines are gone), GONE (the file is gone).
+- **The model workbench** ([`athanor/`](athanor/README.md)) changes only a copy of a local GGUF model. It saves
+  the old bytes before every change, so any change can be undone, `pristine` proves the copy is the original
+  again, and an interrupted edit is recovered.
 
 ## Run the checks
 
@@ -103,7 +135,8 @@ python -B -m symbolics.mutate      # the mutation gate; slow
 ```
 
 Three test modules need NumPy (`pip install "numpy>=1.24"`) and are reported as skipped without it. CI runs all
-of the above, the Go server's tests and the corpus on every push to `main`.
+of the above, athanor's planted-bug check, the Go server's tests and the corpus on every push and pull request
+to `main`.
 
 ## Install
 
@@ -148,6 +181,7 @@ The project prefers a named gap to a claim of completeness.
 | Read | For |
 |---|---|
 | [ELI5.md](docs/ELI5.md) | the whole repository in plain words |
+| [OVERVIEW.md](docs/OVERVIEW.md) | the same for developers: the stack, every folder, and the commands to run it |
 | [API.md](docs/API.md) | `read()`, what it refuses, and why it is shaped this way |
 | [ASSEMBLY_GUIDE.md](docs/ASSEMBLY_GUIDE.md) | plugging in your own parsers, rules, stores and model sandboxes |
 | [STANDARD.md](STANDARD.md) | what counts as VERIFIED, and the break-it rule |
