@@ -214,73 +214,48 @@ def _distinct_outputs(rules: Sequence[Rule], query_norm: str) -> list[str]:
     return outs
 
 
+def _simplest_rules(matches: Sequence[Rule], query_norm: str) -> list[Rule]:
+    """Of the rules that fit the study, those that apply to this query and are the simplest (fewest non-id parts)."""
+    defined = [r for r in matches if r.apply(query_norm) is not None] if query_norm else []
+    if not defined:
+        return []
+    min_c = min(r.complexity for r in defined)
+    return [r for r in defined if r.complexity == min_c]
+
+
 def check_outputs(
     study: Sequence[tuple[str, str]],
     query_outputs: Sequence[tuple[str, str]],
     approved: bool = False,
 ) -> dict:
-    """Verify proposed outputs against Family F; human approval never alters status."""
+    """Verify proposed outputs against Family F; human approval never alters status.
+
+    Each proposal is judged by the simplest rules that fit the study and apply to its query. If they all give one
+    output, the proposal is VERIFIED when it equals it and CONTRADICTED when it does not. If they disagree, a
+    proposal none of them gives is CONTRADICTED, and one that some give is UNCHECKED, since the study cannot tell
+    which rule was meant. With no such rule at all, it is UNCHECKED."""
     matches = matching_rules(study)
-    results: list[dict] = []
-    for query, proposed in query_outputs:
-        q_norm = normalize_hebrew(query)
-        p_norm = normalize_hebrew(proposed)
-        defined = [r for r in matches if r.apply(q_norm) is not None] if q_norm else []
-        if not q_norm or not defined:
-            results.append(
-                {
-                    "query": query,
-                    "proposed": proposed,
-                    "status": "UNCHECKED",
-                    "checker_output": None,
-                    "rule": None,
-                }
-            )
-            continue
-        min_c = min(r.complexity for r in defined)
-        tier = [r for r in defined if r.complexity == min_c]
-        outs = _distinct_outputs(tier, q_norm)
-        if len(outs) == 1:
-            expected = outs[0]
-            best_rule = tier[0].name
-            status = "VERIFIED" if p_norm == expected else "CONTRADICTED"
-            results.append(
-                {
-                    "query": query,
-                    "proposed": proposed,
-                    "status": status,
-                    "checker_output": expected,
-                    "rule": best_rule,
-                }
-            )
-        elif p_norm not in outs:
-            results.append(
-                {
-                    "query": query,
-                    "proposed": proposed,
-                    "status": "CONTRADICTED",
-                    "checker_output": outs[0],
-                    "candidates": outs,
-                    "rule": tier[0].name,
-                }
-            )
-        else:
-            results.append(
-                {
-                    "query": query,
-                    "proposed": proposed,
-                    "status": "UNCHECKED",
-                    "reason": "ambiguous_study",
-                    "checker_output": None,
-                    "candidates": outs,
-                    "rule": None,
-                }
-            )
     return {
         "approved": bool(approved),
         "matched_rules": [r.name for r in matches],
-        "results": results,
+        "results": [_check_one(matches, query, proposed) for query, proposed in query_outputs],
     }
+
+
+def _check_one(matches: Sequence[Rule], query: str, proposed: str) -> dict:
+    q_norm = normalize_hebrew(query)
+    tier = _simplest_rules(matches, q_norm)
+    result = {"query": query, "proposed": proposed}
+    if not tier:
+        return dict(result, status="UNCHECKED", checker_output=None, rule=None)
+    outs = _distinct_outputs(tier, q_norm)
+    p_norm = normalize_hebrew(proposed)
+    if len(outs) == 1:
+        status = "VERIFIED" if p_norm == outs[0] else "CONTRADICTED"
+        return dict(result, status=status, checker_output=outs[0], rule=tier[0].name)
+    if p_norm not in outs:
+        return dict(result, status="CONTRADICTED", checker_output=outs[0], candidates=outs, rule=tier[0].name)
+    return dict(result, status="UNCHECKED", reason="ambiguous_study", checker_output=None, candidates=outs, rule=None)
 
 
 def tzeruf_apply(
@@ -292,16 +267,12 @@ def tzeruf_apply(
     """Propose outputs for queries given study pairs and verify them through the Family-F gate."""
     matches = matching_rules(study)
     if model_predict is None:
+        # The checker's own proposal: what the first of the simplest fitting rules gives, or "" if none applies.
         proposals: list[str] = []
         for q in queries:
             q_norm = normalize_hebrew(q)
-            defined = [r for r in matches if r.apply(q_norm) is not None] if q_norm else []
-            if defined:
-                min_c = min(r.complexity for r in defined)
-                tier = [r for r in defined if r.complexity == min_c]
-                proposals.append(tier[0].apply(q_norm) or "")
-            else:
-                proposals.append("")
+            tier = _simplest_rules(matches, q_norm)
+            proposals.append((tier[0].apply(q_norm) or "") if tier else "")
     else:
         raw = list(model_predict(study, queries))
         if len(raw) != len(queries):
