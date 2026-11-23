@@ -108,7 +108,7 @@ philosophical or metaphysical claims.
 ## How to run it
 
 Use Python 3.10 or newer for the core. NumPy enables the optional engine and Athanor coverage; scikit-learn is
-needed for one corpus comparison. To get the code, follow "Try it" in the [README](../README.md#try-it).
+needed for one corpus comparison. To get the code, follow "Quick start" in the [README](../README.md#quick-start).
 
 Try the public API. `read()` is on `main`; the v0.3.0 release does not have it yet.
 

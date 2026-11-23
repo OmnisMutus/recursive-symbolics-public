@@ -7,9 +7,10 @@ are. The method's source is credited when the exercise ends.
 
 ## Why an API
 
-The [README](../README.md) names the four slips this repository works against, and the checks it puts in code
-to hold a person and a program alike. Those checks only protect anyone who reaches them. So the API's job is to make **the honest path the easy
-path**, for the person asking as much as for the program asking for them.
+This repository works against four quiet slips, in people and programs alike: uncertainty becomes a confident
+answer, a preference becomes a command, an interpretation becomes apparent reality, and "it ran" becomes "it is
+correct". The checks it puts in code against them only protect anyone who reaches them. So the API's job is to
+make **the honest path the easy path**, for the person asking as much as for the program asking for them.
 
 ## The problem, felt first-hand
 

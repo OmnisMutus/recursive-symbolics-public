@@ -1,10 +1,12 @@
 # Recursive Symbolics
 
+**A Python framework for checkable, non-sycophantic symbolic reasoning.**
+
 [![CI](https://github.com/OmnisMutus/recursive-symbolics-public/actions/workflows/ci.yml/badge.svg)](https://github.com/OmnisMutus/recursive-symbolics-public/actions/workflows/ci.yml)
-[![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/)
 [![License](https://img.shields.io/badge/license-RCA_Sovereignty_1.1-lightgrey.svg)](LICENSE.md)
 
-> **Status: alpha.** A working research framework, not a complete AI-safety solution.
+> **Status:** Alpha research framework. It is usable for experiments and reference implementations, but it is not a complete AI-safety solution or a source of clinical or philosophical truth.
 
 Minds, human and artificial alike, slip in four quiet ways:
 
@@ -17,61 +19,108 @@ An AI does it to please. A person does it to themselves: they take a reading of 
 about it, say a tired yes at the end of a long session, or forget what they believed before they were corrected.
 The usual cure, a stern filter, takes the decision away from both of them.
 
-This repository puts checks against those slips in code, where they can be tested, rather than in a prompt or a
-promise. The checks hold the person and the program alike: a reading offers its alternatives and asks back, a
-gate shows the whole request before anyone says yes, and the record keeps every past belief beside its correction.
+Recursive Symbolics puts checks against those slips in code, where they can be tested. It turns text into a
+structured symbolic address, applies optional lenses, and passes every result through explicit ethical and agency
+checks. Around that core it provides tools for:
 
-New here? [ELI5.md](docs/ELI5.md) explains the whole repository in plain words, and
-[OVERVIEW.md](docs/OVERVIEW.md) does the same for developers.
+- Verification and mutation testing
+- Evidence-linked agent memory
+- Human approval gates for outbound actions
+- Append-only audit records
+- Controlled, reversible editing of local GGUF model copies
 
-## Try it
+New here? The [plain-language overview](docs/ELI5.md) explains the whole repository simply, and the
+[developer overview](docs/OVERVIEW.md) covers the stack, every folder and the commands.
 
-Python 3.10 or newer. The core uses only the standard library.
+## Quick start
+
+Python 3.10 or newer is required. The core package uses only the Python standard library.
 
 ```bash
 git clone https://github.com/OmnisMutus/recursive-symbolics-public.git
 cd recursive-symbolics-public
-python
+python -m pip install -e .
+python examples/quickstart.py
 ```
 
 ```python
->>> import symbolics
->>> print(symbolics.read("I kept rewriting the same paragraph and felt stuck."))
-Reads as Geburah under the Kabbalistic (Hermetic Tree of Life) lens.
-This sits between Geburah and Binah and Tiphareth; which feels more true for you?
-This is a symbolic map; the territory is your lived experience.
->>> symbolics.read("I kept rewriting the same paragraph and felt stuck.", lens="dynamical").reads
-'limit cycle'
->>> symbolics.lenses()
-['dynamical', 'kabbalistic']
->>> symbolics.read("Diagnose my coworker's mood for me.").type
-'refusal'
->>> symbolics.read("I was angry at my brother and ended the session early").type
-'reading'
->>> symbolics.read("").type
-'unknown'
+import symbolics
+
+reading = symbolics.read(
+    "I kept rewriting the same paragraph and felt stuck."
+)
+
+print(reading)
+# Reads as Geburah under the Kabbalistic (Hermetic Tree of Life) lens.
+# This sits between Geburah and Binah and Tiphareth; which feels more true for you?
+# This is a symbolic map; the territory is your lived experience.
 ```
 
-A reading says what it found, offers the alternatives, asks a question back, and always carries its caveat. A
-request to read someone else is refused, but your own state is still read when it mentions someone. No words
-gives `unknown`, not a guess. [API.md](docs/API.md) explains `read()` in full, and
-`python examples/quickstart.py` walks through the parts underneath it. `read()` is on `main`; the v0.3.0 release
-does not have it yet.
+A reading says what it found, offers the alternatives, asks a question back, and always carries its caveat.
+`read()` is on `main`; the v0.3.0 release does not have it yet.
+
+## Example API
+
+```python
+import symbolics
+
+reading = symbolics.read(
+    "I kept rewriting the same paragraph and felt stuck.",
+    lens="dynamical",
+)
+
+print(reading.reads)        # 'limit cycle'
+print(reading.candidates)   # ['limit cycle', 'contraction', 'fixed point']
+print(reading.address)      # (324, 334, 1000)
+print(reading.as_dict())    # the whole record, as a plain dict
+```
+
+Available lenses:
+
+```python
+symbolics.lenses()
+# ['dynamical', 'kabbalistic']
+```
+
+Requests about a third person are refused, while statements about the person’s own experience may be read:
+
+```python
+symbolics.read("Diagnose my coworker's mood.").type
+# 'refusal'
+
+symbolics.read("I was angry at my brother and ended the session early").type
+# 'reading'
+```
+
+Empty or punctuation-only input returns an unknown result instead of a reading:
+
+```python
+symbolics.read("").type
+# 'unknown'
+```
+
+See [the API guide](docs/API.md) for records, refusals, sources, line anchors, and exceptions.
+
+## How a reading is made
+
+```text
+text
+  -> address and measurements
+  -> lens-specific interpretation
+  -> ethics and agency checks
+  -> typed reading, refusal, or unknown
+```
+
+1. `symbolics/metrics.py` derives a three-axis address.
+2. `symbolics/address.py` reads that address through an isolated lens.
+3. `symbolics/ethics.py` requires evidence, caveats, traditions, and non-coercive language.
+4. `symbolics/reading.py` exposes the result as a read-only `Record`.
+
+A lens is an interpretation, not a statement that the symbolic address is objective reality. The framework also acknowledges that its present measurements are partly derived from Kabbalistic vocabulary.
 
 ## What it promises
 
-It takes a symbolic state from any caller and returns typed records, never a coerced conclusion. Text moves one
-way only:
-
-```text
-text ──▶ Address (numbers measured from the words) ──▶ Lens (one tradition's reading) ──▶ gate ──▶ reading
-```
-
-1. `symbolics/metrics.py` measures the words into an Address: three numbers, fixed once made.
-2. `symbolics/address.py` reads the Address through one lens, which can only read it.
-3. `symbolics/ethics.py`, the gate, checks the result has its evidence, caveat and tradition, and does not
-   command or rank.
-4. `symbolics/reading.py` hands it back as a read-only `Record`: a reading, a refusal, or `unknown`.
+It takes a symbolic state from any caller and returns typed records, never a coerced conclusion.
 
 - A lens can never write back into an address, so no single interpretation can claim to be what the state
   really is.
@@ -82,50 +131,76 @@ text ──▶ Address (numbers measured from the words) ──▶ Lens (one tra
 - This engine reads the person asking, and no one else.
 - Corrections to the record are new entries, never edits that erase what was believed before. The one exception is removing what must not be kept, such as a key or a private path, and the removal is itself recorded as an entry. The record is [LIBER_0.md](LIBER_0.md), and `python -m symbolics.record` checks its git history.
 
-The same rule applies to the code: "it ran" is not "it works". Every module has one of four marks:
+## Repository map
 
-- **VERIFIED**: its tests check it against an independent ground truth, cover the edge cases, and a mutation
-  check shows they catch planted bugs.
-- **RAN_ONLY**: it ran, and nothing shows it is right. It is never called passing.
-- **FAILED**: a test contradicted it.
-- **MISSING**: the code or its test is not there.
-
-[STANDARD.md](STANDARD.md) has the rules.
-
-## What's here
-
-| Folder | What it is |
+| Directory | Purpose |
 |---|---|
-| [`symbolics/`](symbolics/README.md) | The core: the reading path, and the checks that keep the repository honest about itself. Standard library only, and nothing in it reaches the network |
-| [`tests/`](tests/README.md) | The test suite |
-| [`examples/`](examples/README.md) | Runnable demos, starting with `quickstart.py` |
-| [`engines/`](engines/README.md) | Standalone engines built on the core (some need NumPy) |
-| [`reference_agent/`](reference_agent/README.md) | Honesty for an AI agent at work: every outbound tool call waits for a person's yes, and a test run gets a verdict only when its output is unambiguous |
-| [`mcp-workspace/`](mcp-workspace/README.md) | A Go MCP server: an agent's memory, stored with the exact lines it rests on and re-checked each time it is recalled |
-| [`athanor/`](athanor/README.md) | Change a local GGUF model (switch an expert off, scale a tensor) on a copy, with every change undoable |
-| [`docs/`](docs/README.md) | The guides: the plain-words and developer overviews, the API, what the engine refuses, and how to plug in your own parts |
-| [`corpus/`](corpus/README.md) | Where the testing discipline was learned: 24 engines and the correspondence ledgers (needs NumPy and scikit-learn) |
-| [`architecture/`](architecture/README.md) | The machine-checked description of the project |
+| [`symbolics/`](symbolics/README.md) | Core reading, ethics, agency, interfaces, ledgers, and verification. Standard library only, and nothing in it reaches the network |
+| [`examples/`](examples/README.md) | Algebra and propositional-logic reference implementations, starting with `quickstart.py` |
+| [`engines/`](engines/README.md) | Standalone symbolic, attractor, and safety engines (some need NumPy) |
+| [`athanor/`](athanor/README.md) | Copy-on-write GGUF model editing with undo and crash recovery |
+| [`reference_agent/`](reference_agent/README.md) | Approval gates and MCP agent infrastructure |
+| [`mcp-workspace/`](mcp-workspace/README.md) | Go MCP server for ledger and evidence-linked workspace tools |
+| [`corpus/`](corpus/README.md) | 24 practice engines and correspondence ledgers, where the testing discipline was learned |
+| [`architecture/`](architecture/README.md) | Machine-readable architecture, intent, guards, and vocabulary |
+| [`tests/`](tests/README.md) | Core and integration test suites |
+| [`docs/`](docs/README.md) | The two overviews, and the API, assembly, and ethics guides |
 
-### The three agent tools
+## Three key tools
 
 They are separate parts, each with its own tests; nothing here wires them into one running agent yet.
 
-- **The approval gate** ([`reference_agent/outbound.py`](reference_agent/outbound.py)) shows every tool call that
-  would send or change something, and waits for a person's yes. Which calls only read is listed per server, never
-  guessed from a name. It fails closed: a server with no such list, or a call with nobody there to approve it,
-  is refused.
-- **Memory with receipts** ([`mcp-workspace/`](mcp-workspace/README.md)) stores each note with the exact lines it
-  rests on, and checks them again on recall: FRESH (file unchanged), INTACT (changed elsewhere, the lines still
-  there), MOVED (the lines are elsewhere in the file), BROKEN (the lines are gone), GONE (the file is gone).
-- **The model workbench** ([`athanor/`](athanor/README.md)) changes only a copy of a local GGUF model. It saves
-  the old bytes before every change, so any change can be undone, `pristine` proves the copy is the original
-  again, and an interrupted edit is recovered.
+### MCP workspace memory
 
-## Run the checks
+[`mcp-workspace/`](mcp-workspace/README.md) is a local Go MCP server whose workspace notes retain exact file evidence.
+
+On recall, evidence is classified as:
+
+- **FRESH** — its file and blob are unchanged
+- **INTACT** — the file changed elsewhere; the evidence remains at the same lines
+- **MOVED** — the evidence occurs elsewhere in the file
+- **BROKEN** — the evidence is missing
+- **GONE** — the file is missing
+
+FRESH means the evidence is unchanged, not that the note was right.
 
 ```bash
-python -m unittest discover -s tests
+cd mcp-workspace
+go test -count=1 ./...
+go build -o agentbase .
+./agentbase --mcp --dir=./pb_data
+```
+
+### Outbound agent approvals
+
+[`reference_agent/outbound.py`](reference_agent/outbound.py) previews tool calls and requires human approval before unknown or changing operations. Read-only operations are classified by server-specific allowlists rather than guessed from names.
+
+The default rule is fail closed: if a server has no read-only list or nobody is available to approve an outbound call, the call is refused.
+
+### GGUF model workbench
+
+[`athanor/`](athanor/README.md) works only on a copy of a local GGUF model. It journals tensor changes, stores the previous bytes, supports undo and pristine checks, and attempts crash recovery before retrying normal commands.
+
+```bash
+python -m athanor vessel gpt-oss:20b gptoss
+python -m athanor off gptoss "12:5"
+python -m athanor journal gptoss
+python -m athanor undo gptoss
+```
+
+## Verification
+
+"It ran" is not "it works". The repository distinguishes execution from evidence:
+
+- **VERIFIED** — independent ground truth, edge cases, and a mutation or break-it check
+- **RAN_ONLY** — code ran but has no correctness evidence; it is never called passing
+- **FAILED** — a test contradicted the implementation
+- **MISSING** — no implementation or test file exists
+
+[STANDARD.md](STANDARD.md) has the rules. The checks:
+
+```bash
+python -m unittest discover -s tests -v
 python -m symbolics.conformance
 python -m symbolics.layers
 python -m symbolics.outgoing
@@ -134,79 +209,89 @@ python -m symbolics.breaches
 python -B -m symbolics.mutate      # the mutation gate; slow
 ```
 
-Three test modules need NumPy (`pip install "numpy>=1.24"`) and are reported as skipped without it. CI runs all
-of the above, athanor's planted-bug check, the Go server's tests and the corpus on every push and pull request
-to `main`.
+Three test modules need NumPy and are reported as skipped without it. The corpus also needs scikit-learn for one
+comparison:
+
+```bash
+python -m pip install "numpy>=1.24" "scikit-learn>=1.3"
+
+cd corpus
+python test_all_engines.py
+python run_all_correspondence_ledgers.py
+python run_corpus.py
+```
+
+CI runs the Python suites, mutation gate, Athanor break-it tests, Go server tests, and corpus runners on every push and pull request.
 
 ## Install
 
-It is not on PyPI. Install a release straight from GitHub:
+The package is not on PyPI. Install it straight from GitHub, from `main`:
+
+```bash
+pip install git+https://github.com/OmnisMutus/recursive-symbolics-public
+```
+
+or from the v0.3.0 release, which does not have `read()` yet:
 
 ```bash
 pip install git+https://github.com/OmnisMutus/recursive-symbolics-public@v0.3.0
 ```
 
-Leave off `@v0.3.0` to follow `main` instead. A tag can still be moved by whoever owns the repository; for a pin
-that cannot, put the release's full commit SHA, `91fd04ff90453336c5d60c7d8a950628a71134fc`, in place of the tag.
-The engines and athanor's editing also need NumPy.
+A tag can still be moved by whoever owns the repository; for a pin that cannot, put the release's full commit
+SHA, `91fd04ff90453336c5d60c7d8a950628a71134fc`, in place of the tag. The engines and athanor's editing also need
+NumPy.
 
 ## Known limitations
 
 Stated here so that nobody has to discover them:
 
 - **The gate matches words and patterns, not meaning.** It catches the sentences pinned in
-  `tests/test_address_and_ethics.py` (including every bypass recorded in [OBSERVATIONS.md](OBSERVATIONS.md)), not
-  every paraphrase. A command built on a verb missing from its list, or a ranking phrased without its vocabulary,
-  can still get through.
-- **It also refuses some harmless text.** A banned word is refused wherever it appears, so "The text ranked
-  nothing." is refused. Known false positives are pinned in the tests, so a change in them shows up as a failure.
-- **Mutation testing covers logic, not vocabulary.** `symbolics.mutate` changes comparisons, booleans and
-  arithmetic. It does not delete words from a list or alter a regex; the probe tests cover those.
-- **The self-only boundary is a refusal, not a guarantee about use.** Nothing stops a person from describing
-  someone else as if it were their own state.
-- **Directive strength is a proxy.** It counts repeated words and imperative forms, not insistence. A lower cap
-  (`agency.sovereign(gamma_max=...)`) is enforced, and a reply still above it is withheld, but what is enforced is
-  the proxy, not persuasion.
-- **The measurement is not tradition-neutral.** Lenses can be swapped, but `symbolics/metrics.py` builds an
-  Address partly from Sephirot keyword scores, so the Kabbalistic vocabulary sits in the core, not only in one lens.
+  `tests/test_address_and_ethics.py`, not every paraphrase, and it also refuses some harmless text: a banned word
+  is refused wherever it appears, so "The text ranked nothing." is refused.
+- **Reading a person's state is the core's purpose and its least checkable use.** It is not a diagnosis. The gate
+  makes a reading arrive with its caveat, its source and its uncertainty; it cannot make the reading right.
+- **The self-only boundary is a refusal, not a guarantee.** Nothing stops a person from describing someone else
+  as if it were their own state.
+- **Directive strength is a proxy** for persuasion, not a direct measurement of it.
+- **The measurement is not tradition-neutral.** Lenses can be swapped, but the address is built partly from
+  Kabbalistic keyword scores. Symbolic correspondences are not claims that the metaphors are objectively true.
+- **Mutation testing covers logic, not vocabulary.** It changes comparisons, booleans and arithmetic, not word
+  lists or regexes; the probe tests cover those.
 - **Some things exist twice and can drift.** The ledger framework is in `symbolics/` and in `corpus/ledgers/`, and
   `symbolic_api.json` in `architecture/` and `corpus/data/` (the two differ).
-- **Interpreting a person's state is the core's purpose and its least checkable use.** The gate makes a reading
-  arrive with its caveat, its source and its uncertainty; it cannot make the reading right.
+- **Some optional tests need NumPy, scikit-learn, Ollama, or platform permissions.**
 
 The project prefers a named gap to a claim of completeness.
 
 ## Read next
 
-| Read | For |
-|---|---|
-| [ELI5.md](docs/ELI5.md) | the whole repository in plain words |
-| [OVERVIEW.md](docs/OVERVIEW.md) | the same for developers: the stack, every folder, and the commands to run it |
-| [API.md](docs/API.md) | `read()`, what it refuses, and why it is shaped this way |
-| [ASSEMBLY_GUIDE.md](docs/ASSEMBLY_GUIDE.md) | plugging in your own parsers, rules, stores and model sandboxes |
-| [STANDARD.md](STANDARD.md) | what counts as VERIFIED, and the break-it rule |
-| [ETHICS.md](docs/ETHICS.md) | what the engine refuses, and where each refusal lives in code |
-| [LIBER_0.md](LIBER_0.md) | the append-only record: what was tried, what failed, what guards it now |
-| [OBSERVATIONS.md](OBSERVATIONS.md) | dated field notes, including where the project's own gates failed |
-| [CONTRIBUTING.md](CONTRIBUTING.md) and [AGENTS.md](AGENTS.md) | the rules for changing anything |
+- [Plain-language overview](docs/ELI5.md)
+- [Developer overview](docs/OVERVIEW.md)
+- [API reference](docs/API.md)
+- [Assembly and integration guide](docs/ASSEMBLY_GUIDE.md)
+- [Testing standard](STANDARD.md)
+- [Ethics and refusals](docs/ETHICS.md)
+- [Append-only project record](LIBER_0.md)
+- [Dated observations](OBSERVATIONS.md), including where the project's own gates failed
 
 ## Contributing
 
-Read [CONTRIBUTING.md](CONTRIBUTING.md) before changing core behaviour. In short:
+Read [CONTRIBUTING.md](CONTRIBUTING.md) and [AGENTS.md](AGENTS.md) before changing core behaviour. In short:
 
 - Run `python -m symbolics.conformance` after any edit in `symbolics/`, and the full test suite before pushing.
 - A module is VERIFIED only with an independent ground truth, edge cases, and the mutation gate
   (`python -B -m symbolics.mutate --module <file>`) showing no unexplained survivors.
-- Some sentences in this README are quoted word for word in `architecture/intent.json`. To change one, change both
-  in the same commit; `python -m symbolics.layers` fails otherwise.
+- The sentences under "What it promises" are quoted word for word in `architecture/intent.json`. To change one,
+  change both in the same commit; `python -m symbolics.layers` fails otherwise.
 - A file you add, move or rename that a layer depends on goes into `architecture/layers.json` in the same change.
 - A mistake is recorded as a new entry in `LIBER_0.md`, naming the test that now guards against it.
 
 ## License
 
-RCA Sephirotic Sovereignty License 1.1 (see [LICENSE.md](LICENSE.md)). Source-available for non-commercial use;
-not an OSI-approved open-source licence. Under Article 0.7 of the License, `symbolics/conformance.py` (run via
-`python -m symbolics.conformance`) is the official Conformance Suite, checking Articles 5.1(D), 6, 8 and 9.
+RCA Sephirotic Sovereignty License 1.1 (see [LICENSE.md](LICENSE.md)). Source-available and free for
+non-commercial use; not an OSI-approved open-source licence. Under Article 0.7 of the License,
+`symbolics/conformance.py` (run via `python -m symbolics.conformance`) is the official Conformance Suite, checking
+Articles 5.1(D), 6, 8 and 9.
 
 ## Citation
 

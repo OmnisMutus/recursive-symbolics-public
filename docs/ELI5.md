@@ -17,7 +17,7 @@ rules are checked by code rather than promised in a document.
 Everyone, people and AIs alike, slips in the same four ways: being unsure but sounding sure, turning a wish into
 an order, mistaking an opinion for a fact, and thinking "it ran" means "it works". An eager AI helper does it to
 please you; that is called **sycophancy**. People do it to themselves, for example by agreeing to something just
-because they are tired. The [README](../README.md) lists the four slips exactly.
+because they are tired.
 
 The usual fix is a stern guard that blocks things. That stops some harm, but it also takes the decision away from
 you.
@@ -258,7 +258,7 @@ New to it? Start with `corpus/studies/README.md`. It needs NumPy (and scikit-lea
 
 | If you want to... | Read |
 |---|---|
-| run it | the "Try it" section of [README.md](../README.md) |
+| run it | the "Quick start" section of [README.md](../README.md) |
 | plug in your own parts | [ASSEMBLY_GUIDE.md](ASSEMBLY_GUIDE.md) |
 | know what counts as proof | [STANDARD.md](../STANDARD.md) |
 | know what it refuses | [ETHICS.md](ETHICS.md) |
