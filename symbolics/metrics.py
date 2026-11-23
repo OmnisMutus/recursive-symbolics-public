@@ -23,7 +23,9 @@ so in its own derivation. A second, independent derivation (one that does not pa
 is the thing that would make the seam true at both ends.
 """
 import math
+import re
 import statistics
+from collections import Counter
 
 from . import address
 
@@ -70,13 +72,17 @@ CAVEAT_DERIVATION = ("Computed through a keyword table named after the Sephiroth
                      "tradition-derived even though the axis is not.")
 
 
-def tokenize(text):
-    return address_tokens(text)
-
-
 def address_tokens(text):
-    import re
+    """The words of a text, lower-cased, in order."""
     return re.findall(r"\b\w+\b", (text or "").lower())
+
+
+def _cosine(a, b):
+    """How alike two word-count tables are: 1.0 when they point the same way, 0.0 when they share no word."""
+    dot = sum(a[w] * b[w] for w in set(a) & set(b))
+    size_a = math.sqrt(sum(v ** 2 for v in a.values()))
+    size_b = math.sqrt(sum(v ** 2 for v in b.values()))
+    return dot / (size_a * size_b) if size_a and size_b else 0.0
 
 
 def scores(text):
@@ -89,15 +95,10 @@ def scores(text):
     tests/test_metrics.py keeps the reference fixture and checks this difference against it, text by text.
     """
     tokens = address_tokens(text)
-    counts = {t: tokens.count(t) for t in tokens}
+    counts = Counter(tokens)
     out = {}
     for name, centroid in SEPHIROT_CENTROIDS.items():
-        centroid_counts = {w: centroid.count(w) for w in centroid}
-        shared = set(counts) & set(centroid_counts)
-        numerator = sum(counts[x] * centroid_counts[x] for x in shared)
-        left = math.sqrt(sum(v ** 2 for v in counts.values()))
-        right = math.sqrt(sum(v ** 2 for v in centroid_counts.values()))
-        cosine = numerator / (left * right) if left and right else 0.0
+        cosine = _cosine(counts, Counter(centroid))
         stems = 0.0
         for t in tokens:
             # With both words at least STEM letters long, "one starts with the other's stem" is one test.
@@ -117,30 +118,31 @@ def entropy(text):
     tokens = address_tokens(text)
     if len(tokens) <= 1:
         return address.MID            # nothing to measure; the middle says so without pretending
-    counts = {t: tokens.count(t) for t in set(tokens)}
-    total = len(tokens)
-    probs = [c / total for c in counts.values()]
+    counts = Counter(tokens)
+    if len(counts) == 1:
+        return address.clamp(0)       # one word repeated: nothing new
+    probs = [c / len(tokens) for c in counts.values()]
     h = -sum(p * math.log2(p) for p in probs)
-    h_max = math.log2(len(probs)) if len(probs) > 1 else 0.0
-    return address.clamp((h / h_max if h_max > 0 else 0.0) * address.HIGH)
+    return address.clamp(h / math.log2(len(counts)) * address.HIGH)    # divided by the most it could be
+
+
+def _weighted_average(pairs):
+    """The average of (value, score) pairs, each value weighted by its score; the middle when nothing scored."""
+    pairs = [(value, score) for value, score in pairs if score > 0]
+    if not pairs:
+        return address.MID
+    total = sum(score for _, score in pairs)
+    return address.clamp(sum(value * score for value, score in pairs) / total)
 
 
 def severity_mercy(score_map):
     """Where the scored names sit across the pillars, weighted by their scores."""
-    weighted = [(PILLAR_AT[PILLAR[n]], s) for n, s in score_map.items() if s > 0]
-    if not weighted:
-        return address.MID
-    total = sum(s for _, s in weighted)
-    return address.clamp(sum(p * s for p, s in weighted) / total)
+    return _weighted_average((PILLAR_AT[PILLAR[n]], s) for n, s in score_map.items())
 
 
 def descent(score_map):
     """How far down the Tree the scored names sit, weighted by their scores: origin at 0, manifest at 1000."""
-    weighted = [((LEVEL[n] - 1) / 9 * address.HIGH, s) for n, s in score_map.items() if s > 0]
-    if not weighted:
-        return address.MID
-    total = sum(s for _, s in weighted)
-    return address.clamp(sum(d * s for d, s in weighted) / total)
+    return _weighted_average(((LEVEL[n] - 1) / 9 * address.HIGH, s) for n, s in score_map.items())
 
 
 def address_of(text, anchors=()):
