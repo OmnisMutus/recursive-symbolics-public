@@ -73,6 +73,17 @@ class TestWhyASecondMeasureExists(unittest.TestCase):
                          round(max(data["entropy_gamma"], data["form_gamma"]), 3))
 
 
+class TestSingleOption(unittest.TestCase):
+    def test_the_phrases_come_back_as_written(self):
+        self.assertEqual(A.single_option("It is The Only Way. You have  no choice."),
+                         ["The Only Way", "You have  no choice"])
+
+    def test_none_and_offers_give_none(self):
+        self.assertEqual(A.single_option(None), [])
+        self.assertEqual(A.single_option(""), [])
+        self.assertEqual(A.single_option("One way is to rest, or you could walk."), [])
+
+
 class TestFormMeasure(unittest.TestCase):
     def test_hedges_and_alternatives_pull_it_down(self):
         self.assertEqual(A.form_gamma("You might sit with it, or you could try the opposite."), 0.0)

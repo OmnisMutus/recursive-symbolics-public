@@ -18,12 +18,15 @@ from .interfaces import (
     SymbolicBackend,
     SymbolicState,
 )
+from .checking import Check, check
 from .reading import NotARead, Record, Refused, Unknown, lenses, read, readings
 
 __all__ = [
     "read",
     "readings",
     "lenses",
+    "check",
+    "Check",
     "Record",
     "NotARead",
     "Refused",

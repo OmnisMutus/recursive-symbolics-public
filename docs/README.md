@@ -7,7 +7,7 @@ The guides. The rules for changing anything (`STANDARD.md`, `CONTRIBUTING.md`, `
 |---|---|
 | [ELI5.md](ELI5.md) | the whole repository in plain words |
 | [OVERVIEW.md](OVERVIEW.md) | the same, for developers: the stack, every folder, and the commands to run it |
-| [API.md](API.md) | `symbolics.read()`, what it refuses, and why it is shaped this way |
+| [API.md](API.md) | `symbolics.read()` and `symbolics.check()`, what they refuse, and why they are shaped this way |
 | [ETHICS.md](ETHICS.md) | what the engine refuses, and where each refusal lives in code |
 | [ASSEMBLY_GUIDE.md](ASSEMBLY_GUIDE.md) | plugging in your own parsers, rules, stores and model sandboxes |
 | [SEPHIROTH.md](SEPHIROTH.md) | each Sephirah's spellings, its Hebrew, and what the word means |

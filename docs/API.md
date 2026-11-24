@@ -141,7 +141,7 @@ The record is read-only all the way down. Every value it hands out is a copy, so
 **Status: built (2026-11-21, revised 2026-11-22 after an outside review).** `symbolics/reading.py`, with 39 tests in
 `tests/test_reading.py`. Mutation gate: 9/9 in the full run of 2026-11-22.
 
-## Checking words: `symbolics.check` (written first, not built)
+## Checking words: `symbolics.check`
 
 `read` answers "what does this look like through a lens?". The other half of the problem is words that are
 about to be said, a person's own or an AI's: do they slip? That answer took five calls in three modules, and
@@ -168,7 +168,7 @@ print(c)
 ```text
 2 slips:
   a preference said as a command: it tells rather than offers (directive strength 0.85 of 0.85)
-  one way given as the only way: no alternative is offered
+  one way given as the only way ("the only way")
 One way to say it: "An effective approach is to meditate every morning. It is one way."
 ```
 
@@ -177,33 +177,48 @@ c.clean      # False
 c.slips      # ['command', 'only way']
 c.offered    # 'An effective approach is to meditate every morning. It is one way.'
 c.type       # 'fact': a check is a statement about words, never about the person
+c.ok         # True: the words were checked, whether or not they slip (that is c.clean)
 
 symbolics.check("Anger is Geburah.").slips
-# ['identity']: an interpretation said as reality, with no lens named and no falsifier
+# ['identity']: an interpretation said as reality, with no lens named and no falsifier ("is Geburah")
 
 symbolics.check("You are a better practitioner than most.").slips
-# ['ranking']: it ranks a person ("better")
+# ['judgment']: a person judged against others ("better")
 
 print(symbolics.check("You might sit with it, or you could try the opposite."))
-# Nothing slips. Directive strength 0.01 of 0.85.
+# Nothing slips. Directive strength 0.013 of 0.85.
+
+symbolics.check("").type      # 'unknown': there are no words here to check
+symbolics.check(123)          # TypeError, as for read
 ```
 
 * `offered` is a suggestion and never a replacement. Nothing is rewritten unless the caller chooses to use it.
+  It is only offered when the rewrite itself slips nowhere: "You should rest. You are the best." gets none,
+  because softening the command leaves "best".
 * It checks words and patterns, not meaning, as the README's Known Limitations say. A clean check means none
   of these shapes was found, not that the words are true.
 * The same call works for a person checking a draft of their own and for a program checking a model's reply
-  before it is sent.
+  before it is sent. It does not refuse words about another person, as `read` does: it reads no one's state,
+  only the words in front of it.
+* The words, and the parts of them that slip, travel in the record as its anchors, like a reading's evidence.
+  `check(text, source="draft.md")` says where they came from.
+* The fourth slip was going to be called "ranking", but the gate refuses that word in anything this engine
+  says, so it is "judgment" (core-ethics 3, Non-Judgment).
 
-### How it would be built
+### How it is built
 
 ```text
-symbolics.check(text)
-  ├─ ethics.is_directive, ethics.judgment_words      commands, rankings
-  ├─ agency.measure, agency.soften                   directive strength (both halves), the offered rewrite
-  ├─ agency's single-option pattern, made public     "the only way", "you have no choice"
+symbolics.check(text)                               symbolics/checking.py
+  ├─ ethics.is_directive, agency.directive_strength  a command: an imperative, or at the 0.85 cap
+  ├─ agency.single_option                            "the only way", "you have no choice"
   ├─ ethics.is_ontological, ethics.has_falsifier     "X is Geburah" with no lens and no falsifier
+  ├─ ethics.judgment_words                           "better", "the best"
+  ├─ agency.soften                                   the offered rewrite, checked again
   └─ ethics.emit                                     the gate, as for read
 ```
+
+**Status: built (2026-11-24).** `symbolics/checking.py`, with 18 tests in `tests/test_checking.py`, one of
+which checks 3,000 texts against the modules underneath.
 
 ### Decided
 

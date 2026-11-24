@@ -119,6 +119,11 @@ def alternatives(text):
     return len(_ALTERNATIVE.findall(t)) + (1 if _HEDGE.search(t) else 0)
 
 
+def single_option(text):
+    """The phrases that give one way as the only way ("the only way", "you have no choice"), as written."""
+    return [m.group(0) for m in _SUPERLATIVE_FRAME.finditer(str(text or ""))]
+
+
 def directive_strength(text):
     """The governing gamma: the higher of the two measures, so a text that pushes by either reading is treated
     as pushing. Returns a float in [0, GAMMA_MAX], which is the interface the Conformance Suite checks."""

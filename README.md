@@ -102,7 +102,17 @@ symbolics.read("").type
 # 'unknown'
 ```
 
-See [the API guide](docs/API.md) for records, refusals, sources, line anchors, and exceptions.
+Words about to be said, your own draft or a program's reply, can be checked for the slips before they go out:
+
+```python
+symbolics.check("You must meditate every morning. It is the only way.").slips
+# ['command', 'only way']
+
+symbolics.check("Anger is Geburah.").slips
+# ['identity']
+```
+
+See [the API guide](docs/API.md) for records, refusals, sources, line anchors, exceptions, and checks.
 
 ## How a reading is made
 

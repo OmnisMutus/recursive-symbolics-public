@@ -28,6 +28,7 @@ or UNTESTABLE. The rest are the checks that keep the repository honest about its
 | File | What it does |
 |---|---|
 | `reading.py` | The front door: `read(text)` runs the whole path below in one call and returns a `Record`; `readings()` reads with every lens; `lenses()` lists them. See `docs/API.md`. |
+| `checking.py` | The other front door: `check(text)` says whether words slip (a command, one way as the only way, an identity, a judgment), asking `ethics` and `agency` in one place, and returns a `Check`. |
 | `metrics.py` | The measurement layer: text in, observables out (entropy, centroid scores, latency helpers). Every address it builds says in its own derivation what the measurement cannot see. |
 | `address.py` | The address space: a three-axis point no tradition owns, and the read-only lenses that interpret one. |
 | `ethics.py` | The gate every reading passes through. `check_request()` refuses requests about a third party and the undefined `transcend` operator; `emit()` refuses a reading without its caveat, tradition, source or anchors, and any that ranks a person or commands. It matches words and patterns, not meaning: see Known Limitations in the main README. |
