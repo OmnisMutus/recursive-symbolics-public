@@ -389,12 +389,20 @@ def synthesize_natural_conversational_response(prompt: str, seph: str, bal: str)
 # SLASH COMMAND HANDLER
 # ==============================================================================
 def handle_slash_command(cmd: str):
+    """Run one sandbox command, such as /help or /eval <text>, and print what it shows."""
     parts = cmd.strip().split(maxsplit=1)
     base_cmd = parts[0].lower()
+    # /eval and /qualia read this sample sentence when no text follows the command.
     extra_text = parts[1] if len(parts) > 1 else "I am analyzing code structure and system architecture"
-    
-    if base_cmd == "/help":
-        print("""
+    command = _SLASH_COMMANDS.get(base_cmd)
+    if command is None:
+        print(f"  Unknown command '{base_cmd}'. Type '/help' for options.")
+    else:
+        command(extra_text)
+
+
+def _show_help(_text: str):
+    print("""
         ============================================================
                SYMBOLIC OS V2.0 INTERACTIVE SLASH COMMAND MENU
         ============================================================
@@ -406,24 +414,27 @@ def handle_slash_command(cmd: str):
                   exit     - Exit sandbox session
         ============================================================
         """)
-    elif base_cmd == "/eval":
-        scores = compute_sephirotic_vector_scores(extra_text)
-        gov = evaluate_v2_governance(extra_text, scores)
-        print("\n" + "="*70)
-        print("  EPISTEMIC GOVERNANCE V2.0 EVALUATION DECK")
-        print("="*70)
-        print(f" > Evaluated Target Text : \"{extra_text}\"")
-        _seph = gov['dominant_seph']
-        _colored_seph = colorize_sephirah(_seph, _seph)
-        print(f" > Diagnosed Pattern (D2): {_colored_seph}{sephirah_planet_label(_seph)} [Confidence: {gov['confidence_pct']}%]")
-        print(f" > Provisional Tag       : [PROVISIONAL METAPHOR, NOT ONTOLOGICAL TRUTH]")
-        print(f" > Context Teleology     : {gov['teleology_mode']}")
-        print(f" > Falsifiability Test   : {gov['falsifiability_condition']}")
-        if gov['alternatives']:
-            print(f" > Alternatives          : {', '.join(gov['alternatives'])}")
-        print("="*70 + "\n")
-    elif base_cmd == "/learn":
-        print("""
+
+
+def _show_eval(text: str):
+    scores = compute_sephirotic_vector_scores(text)
+    gov = evaluate_v2_governance(text, scores)
+    seph = gov['dominant_seph']
+    print("\n" + "="*70)
+    print("  EPISTEMIC GOVERNANCE V2.0 EVALUATION DECK")
+    print("="*70)
+    print(f" > Evaluated Target Text : \"{text}\"")
+    print(f" > Diagnosed Pattern (D2): {colorize_sephirah(seph, seph)}{sephirah_planet_label(seph)} [Confidence: {gov['confidence_pct']}%]")
+    print(f" > Provisional Tag       : [PROVISIONAL METAPHOR, NOT ONTOLOGICAL TRUTH]")
+    print(f" > Context Teleology     : {gov['teleology_mode']}")
+    print(f" > Falsifiability Test   : {gov['falsifiability_condition']}")
+    if gov['alternatives']:
+        print(f" > Alternatives          : {', '.join(gov['alternatives'])}")
+    print("="*70 + "\n")
+
+
+def _show_curriculum(_text: str):
+    print("""
         ============================================================
                 4-WEEK SOFTWARE ENGINEERING CURRICULUM TUTOR
         ============================================================
@@ -437,24 +448,39 @@ def handle_slash_command(cmd: str):
                   Target File: opengl_3d_scene_simulator.py & safe_memory_boundary_engine.py
         ============================================================
         """)
-    elif base_cmd == "/memory":
-        print("\n  --- [RCA PERSISTENT Q-LEARNING WEIGHTS] ---")
-        print(f"  Total Interactions : {LEARNING_ENGINE.total_interactions}")
-        print("  State Weights      :")
-        for seph, weight in LEARNING_ENGINE.transition_weights.items():
-            print(f"    {seph:10s} : {weight:.3f}")
-        print()
-    elif base_cmd == "/qualia":
-        q = compute_qualia_vector(extra_text, compute_sephirotic_vector_scores(extra_text))
-        print(f"\n  --- [4D QUALIA VECTOR TELEMETRY (Q)] ---")
-        print(f"  Φ_somatic   (Body Baseline) : {q['Phi_somatic']:.3f}")
-        print(f"  H_emotional (Entropy)       : {q['H_emotional']:.3f}")
-        print(f"  Δγ_teleos   (Friction)      : {q['Delta_gamma']:.3f}")
-        print(f"  τ_resonance (Awe Alignment) : {q['Tau_resonance']:.3f}\n")
-    elif base_cmd == "/dht":
-        print("   dht_rca_node.py is not bundled in this standalone sandbox.")
-    else:
-        print(f"  Unknown command '{base_cmd}'. Type '/help' for options.")
+
+
+def _show_memory(_text: str):
+    print("\n  --- [RCA PERSISTENT Q-LEARNING WEIGHTS] ---")
+    print(f"  Total Interactions : {LEARNING_ENGINE.total_interactions}")
+    print("  State Weights      :")
+    for seph, weight in LEARNING_ENGINE.transition_weights.items():
+        print(f"    {seph:10s} : {weight:.3f}")
+    print()
+
+
+def _show_qualia(text: str):
+    q = compute_qualia_vector(text, compute_sephirotic_vector_scores(text))
+    print(f"\n  --- [4D QUALIA VECTOR TELEMETRY (Q)] ---")
+    print(f"  Φ_somatic   (Body Baseline) : {q['Phi_somatic']:.3f}")
+    print(f"  H_emotional (Entropy)       : {q['H_emotional']:.3f}")
+    print(f"  Δγ_teleos   (Friction)      : {q['Delta_gamma']:.3f}")
+    print(f"  τ_resonance (Awe Alignment) : {q['Tau_resonance']:.3f}\n")
+
+
+def _show_dht_missing(_text: str):
+    print("   dht_rca_node.py is not bundled in this standalone sandbox.")
+
+
+# Each command takes the text typed after it; the ones that do not need it ignore it.
+_SLASH_COMMANDS = {
+    "/help": _show_help,
+    "/eval": _show_eval,
+    "/learn": _show_curriculum,
+    "/memory": _show_memory,
+    "/qualia": _show_qualia,
+    "/dht": _show_dht_missing,
+}
 
 # ==============================================================================
 # MAIN RCA INTERACTION PIPELINE
