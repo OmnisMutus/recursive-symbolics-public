@@ -33,7 +33,7 @@ gate at the exit can guarantee.
 """
 import re
 
-from symbolics import agency
+from symbolics import address, agency
 
 CORE_AXIOM = ("True symbolic systems do not believe their own symbols — they operate them with calibrated "
               "epistemic humility as maps, not territory.")
@@ -63,7 +63,10 @@ HYPOTHESIS_DUTIES = ("formally defined in symbolic or mathematical notation",
 # version of this pattern caught only the first, because it required the symbol to be the object.
 # Keter and Tifereth added 2026-11-22 (outside review): symbolics/metrics.py spells them that way, so "Balance is Tifereth."
 # was not seen as an identity claim.
-SYMBOLS = (r"Kether|Keter|Chokmah|Binah|Chesed|Geburah|Tiphareth|Tifereth|Netzach|Hod|Yesod|Malkuth|Da'?ath|"
+# The Sephiroth come from their one definition in symbolics/address.py, in every English spelling and in Hebrew,
+# so a spelling added there is seen here too.
+_SEPHIRAH_NAMES = [n for s in address.SEPHIROTH for n in s.spellings] + list(address.HEBREW_SPELLINGS)
+SYMBOLS = ("|".join(re.escape(n) for n in _SEPHIRAH_NAMES) + "|"
            r"Aleph|Beth|Gimel|Daleth|Heh|Vav|Vau|Zayin|Zain|Cheth|Teth|Yod|Kaph|Lamed|Mem|Nun|Samekh|"
            r"Ayin|Peh|Pe|Tzaddi|Qoph|Resh|Shin|Tav|Tau")
 IS_VERB = r"(?:is|are|means|equals|represents|corresponds\s+to)"
@@ -124,7 +127,8 @@ def _sentence_around(text, start, end):
 
 def is_ontological(text):
     """Identity claims this framework forbids, minus the ones already said as a reading."""
-    text = text or ""
+    # Hebrew vowel points are taken off first, so a pointed name (גְּבוּרָה) is caught like a plain one.
+    text = address.without_hebrew_marks(text or "")
     out = []
     for m in ONTOLOGICAL.finditer(text):
         if _HEDGE.search(_sentence_around(text, m.start(), m.end())):

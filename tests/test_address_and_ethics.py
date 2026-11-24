@@ -415,5 +415,46 @@ class TestRecordedBypasses(unittest.TestCase):
                 self.assertEqual(E.judgment_words(text), [])
 
 
+class TestSephirothNames(unittest.TestCase):
+    def test_every_spelling_names_one_sephirah_only(self):
+        seen = {}
+        for s in A.SEPHIROTH:
+            self.assertEqual(s.spellings[0], s.name)
+            for n in s.spellings:
+                self.assertNotIn(n.casefold(), seen, f"{n} names both {seen.get(n.casefold())} and {s.name}")
+                seen[n.casefold()] = s.name
+        self.assertEqual(len(A.SEPHIROTH), 11)               # the ten, and Daath
+
+    def test_the_tree_uses_the_defined_names(self):
+        self.assertEqual([s.name for s in A.SEPHIROTH[:10]], list(A.KABBALISTIC.places))
+        self.assertEqual(A.SEPHIROTH[-1].name, "Daath")      # drawn on some Trees, not one of the ten
+
+    def test_every_sephirah_has_one_hebrew_word_and_answers_in_english(self):
+        self.assertEqual(sorted(A.HEBREW_SPELLINGS.values()), sorted(s.name for s in A.SEPHIROTH))
+        for hebrew, name in A.HEBREW_SPELLINGS.items():
+            s = A.sephirah_named(hebrew)
+            self.assertEqual(s.name, name)
+            self.assertTrue(all(ch.isascii() or ch == "’" for n in s.spellings for ch in n), repr(s))
+
+    def test_only_hebrew_marks_are_taken_off(self):
+        self.assertEqual(A.without_hebrew_marks("גְּבוּרָה"), "גבורה")
+        self.assertEqual(A.without_hebrew_marks("תִּפְאֶרֶת"), "תפארת")
+        self.assertEqual(A.without_hebrew_marks("בֵּית־אֵל׃ Café ë"), "בית־אל׃ Café ë")   # maqaf, sof pasuq, Latin kept
+
+    def test_each_spelling_finds_its_sephirah(self):
+        cases = {"Kether": "Kether", "keter": "Kether", "  TIFERET ": "Tiphareth", "Tifereth": "Tiphareth",
+                 "Gevurah": "Geburah", "Hesed": "Chesed", "Chochmah": "Chokmah", "Malchut": "Malkuth",
+                 "Da'ath": "Daath", "Da’ath": "Daath", "Daat": "Daath", "Hod": "Hod", "Binah": "Binah",
+                 "גבורה": "Geburah", " כתר ": "Kether", "דעת": "Daath", "גְּבוּרָה": "Geburah", "תִּפְאֶרֶת": "Tiphareth"}
+        for word, name in cases.items():
+            with self.subTest(word=word):
+                self.assertEqual(A.sephirah_named(word).name, name)
+
+    def test_a_word_that_is_no_sephirah_finds_none(self):
+        for word in ("", None, "Keterr", "Kethe", "Tree", "Aleph", "Geburah Hod", "גבור", "גבורה הוד"):
+            with self.subTest(word=word):
+                self.assertIsNone(A.sephirah_named(word))
+
+
 if __name__ == "__main__":
     unittest.main()

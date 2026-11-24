@@ -140,6 +140,20 @@ class TestTheAgencyBudget(unittest.TestCase):
         # Outside review, 2026-11-22: metrics.py spells Keter and Tifereth; governance knew only Kether and Tiphareth
         self.assertEqual(G.is_ontological("Balance is Tifereth. Origin is Keter."), ["is Tifereth", "is Keter"])
 
+    def test_every_defined_spelling_is_a_symbol(self):
+        # 2026-11-23: the Sephiroth now come from symbolics.address.SEPHIROTH, in every spelling and in Hebrew
+        from symbolics.address import HEBREW_SPELLINGS, SEPHIROTH
+        for s in SEPHIROTH:
+            for n in (*s.spellings, *(h for h, name in HEBREW_SPELLINGS.items() if name == s.name)):
+                with self.subTest(name=n):
+                    self.assertEqual(G.is_ontological(f"Anger is {n}."), [f"is {n}"])
+                    self.assertEqual(G.is_ontological(f"{n} means anger."), [f"{n} means"])
+                    self.assertEqual(G.is_ontological(f"Anger is {n}, on this map."), [])
+        self.assertEqual(G.is_ontological("Anger is Gevurahs."), [])      # a whole word only
+        self.assertEqual(G.is_ontological("Anger is גבורות."), [])         # a whole Hebrew word only
+        self.assertEqual(G.is_ontological("Anger is גְּבוּרָה."), ["is גבורה"])   # with vowel points too
+        self.assertEqual(G.is_ontological("כעס is גבורה, on this map."), [])
+
     def test_a_hedge_excuses_only_its_own_sentence(self):
         # Outside review, 2026-11-22: the "lens" of a camera, a sentence earlier, excused the claim
         self.assertEqual(G.is_ontological("I wiped my camera lens. Anger is Geburah."), ["is Geburah"])

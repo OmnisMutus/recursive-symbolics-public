@@ -25,6 +25,7 @@ reading that cannot point at the words it came from is refused elsewhere in this
 """
 import dataclasses
 import math
+import re
 import types
 
 AXES = ("severity_mercy", "descent", "entropy")
@@ -146,6 +147,61 @@ class Lens:
         for name, where in self.places.items():
             if len(where) != 2 or not all(LOW <= v <= HIGH for v in where):
                 raise ValueError(f"{self.tradition}: '{name}' sits outside the space at {where}.")
+
+
+@dataclasses.dataclass(frozen=True)
+class Sephirah:
+    """One Sephirah's names: the one this code uses, and every English spelling of it."""
+
+    name: str
+    spellings: tuple
+
+
+# Each Sephirah once, the way a name is defined once in code and its aliases point to it. English spells the
+# Hebrew several ways: the Golden Dawn wrote Kether and Tiphareth, modern romanisation writes Keter and Tiferet,
+# and this repository uses both. Every spelling in a row names the same Sephirah; the first is `name`.
+# Daath is listed last: it is drawn on some Trees but is not one of the ten. The Hebrew each row spells, and what
+# the word means, are in docs/SEPHIROTH.md: support for the reader, never shown as output.
+SEPHIROTH = tuple(Sephirah(row[0], row) for row in [
+    ("Kether", "Keter"),
+    ("Chokmah", "Chochmah", "Chokhmah", "Hokhmah", "Hokmah"),
+    ("Binah",),
+    ("Chesed", "Hesed", "Khesed"),
+    ("Geburah", "Gevurah", "Gebura", "Gevura"),
+    ("Tiphareth", "Tifereth", "Tiferet", "Tiphereth", "Tipheret"),
+    ("Netzach", "Netsach", "Nezach"),
+    ("Hod",),
+    ("Yesod",),
+    ("Malkuth", "Malchut", "Malkhut", "Malchuth"),
+    ("Daath", "Da'ath", "Da’ath", "Da'at", "Daat"),
+])
+
+# The Hebrew word each name spells, so a Sephirah written in Hebrew is recognised too. This is for reading what
+# someone wrote, never for output: the code always answers with the English name, because not everyone reads
+# Hebrew. The same table, with what each word means, is in docs/SEPHIROTH.md.
+HEBREW_SPELLINGS = {
+    "כתר": "Kether", "חכמה": "Chokmah", "בינה": "Binah", "חסד": "Chesed", "גבורה": "Geburah",
+    "תפארת": "Tiphareth", "נצח": "Netzach", "הוד": "Hod", "יסוד": "Yesod", "מלכות": "Malkuth", "דעת": "Daath",
+}
+
+# Hebrew vowel points and cantillation marks. They sit on the letters, so גְּבוּרָה and גבורה are one word once
+# they are taken off. Hebrew punctuation in the same Unicode block (maqaf, paseq, sof pasuq) is kept.
+_HEBREW_MARKS = re.compile("[֑-ׇֽֿׁׂׅׄ]")
+
+
+def without_hebrew_marks(text):
+    """The text with Hebrew vowel points and cantillation taken off; everything else is left as it was."""
+    return _HEBREW_MARKS.sub("", text)
+
+
+def sephirah_named(word):
+    """The Sephirah this word spells, in any English spelling and any case, or in Hebrew; None if it spells none."""
+    word = without_hebrew_marks(word or "").strip()
+    word = HEBREW_SPELLINGS.get(word, word).casefold()
+    for s in SEPHIROTH:
+        if word in (spelling.casefold() for spelling in s.spellings):
+            return s
+    return None
 
 
 # The Tree as it is drawn: the three pillars across, the ten numbers down. Severity on the left, Mercy on the
