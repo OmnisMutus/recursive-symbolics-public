@@ -162,16 +162,18 @@ class Sephirah:
 # and this repository uses both. Every spelling in a row names the same Sephirah; the first is `name`.
 # Daath is listed last: it is drawn on some Trees but is not one of the ten. The Hebrew each row spells, and what
 # the word means, are in docs/SEPHIROTH.md: support for the reader, never shown as output.
+# Bina drops the silent final h. Jesod is the German and older Latin spelling, Iesod the Latin of the 1600s.
+# Hod is written the same way in every romanisation, so its row has one spelling.
 SEPHIROTH = tuple(Sephirah(row[0], row) for row in [
     ("Kether", "Keter"),
     ("Chokmah", "Chochmah", "Chokhmah", "Hokhmah", "Hokmah"),
-    ("Binah",),
+    ("Binah", "Bina"),
     ("Chesed", "Hesed", "Khesed"),
     ("Geburah", "Gevurah", "Gebura", "Gevura"),
     ("Tiphareth", "Tifereth", "Tiferet", "Tiphereth", "Tipheret"),
     ("Netzach", "Netsach", "Nezach"),
     ("Hod",),
-    ("Yesod",),
+    ("Yesod", "Jesod", "Iesod"),
     ("Malkuth", "Malchut", "Malkhut", "Malchuth"),
     ("Daath", "Da'ath", "Da’ath", "Da'at", "Daat"),
 ])

@@ -22,6 +22,8 @@ The refusals are the only place this engine is allowed to be directive.
 import re
 from collections.abc import Mapping
 
+from . import address
+
 CAVEAT = "This is a symbolic map; the territory is your lived experience."
 
 # core-ethics 3: "Avoid words like 'optimal', 'deficient', 'better', 'worse'." Ranking a person's state is the
@@ -157,6 +159,66 @@ def is_directive(text):
         if IMPERATIVE.search(sentence) and not _OPTATIVE.search(sentence):
             return True
     return False
+
+
+# ---- Identity claims (the provisional proviso) ----
+# A correspondence is a reading, never an identity: "anger reads as Geburah under this lens", not "anger is
+# Geburah". Moved here from reference_agent/governance.py on 2026-11-24, unchanged, so the core can check it;
+# governance imports it from here.
+# Claiming identity between a thing and a symbol: what the Core Axiom forbids ("Anger is Geburah").
+# Both directions count. "Anger is Geburah" and "Shin represents Fire" are the same move, and an earlier
+# version of this pattern caught only the first, because it required the symbol to be the object.
+# Keter and Tifereth added 2026-11-22 (outside review): symbolics/metrics.py spells them that way, so "Balance is Tifereth."
+# was not seen as an identity claim.
+# The Sephiroth come from their one definition in symbolics/address.py, in every English spelling and in Hebrew,
+# so a spelling added there is seen here too.
+_SEPHIRAH_NAMES = [n for s in address.SEPHIROTH for n in s.spellings] + list(address.HEBREW_SPELLINGS)
+SYMBOLS = ("|".join(re.escape(n) for n in _SEPHIRAH_NAMES) + "|"
+           r"Aleph|Beth|Gimel|Daleth|Heh|Vav|Vau|Zayin|Zain|Cheth|Teth|Yod|Kaph|Lamed|Mem|Nun|Samekh|"
+           r"Ayin|Peh|Pe|Tzaddi|Qoph|Resh|Shin|Tav|Tau")
+IS_VERB = r"(?:is|are|means|equals|represents|corresponds\s+to)"
+ONTOLOGICAL = re.compile(
+    rf"\b{IS_VERB}\s+(?:the\s+|a\s+|an\s+)?(?:{SYMBOLS})\b"      # a thing IS a symbol
+    rf"|\b(?:{SYMBOLS})\b\s+{IS_VERB}\b",                        # a symbol IS a thing
+    re.IGNORECASE)
+# The same content, said as a reading rather than an identity. These are what the gate wants instead.
+HEDGED = ("reads as", "reads like", "under the", "lens", "one reading", "provisional", "may be read",
+          "corresponds, provisionally", "in this framework", "on this map", "treated as")
+# A falsifier has to name an observation, not a feeling.
+FALSIFIER_SHAPE = re.compile(
+    r"\b(?:if|when|unless|were|should)\b.{0,200}?"
+    r"\b(?:then|would|falsif\w*|refut\w*|disconfirm\w*|contradict\w*|fail\w*|wrong|incorrect|false|"
+    r"invalid\w*|dies|die|break\w*|collaps\w*|does\s+not\s+hold|no\s+longer\s+holds)\b",
+    re.IGNORECASE | re.S)
+
+# A hedge counts only as a whole word or phrase, and only in the same sentence as the claim it excuses
+# (2026-11-22, an outside review: "I wiped my camera lens. Anger is Geburah." was excused by the "lens" of another sentence).
+_HEDGE = re.compile(r"\b(?:" + "|".join(re.escape(h) for h in HEDGED) + r")\b", re.IGNORECASE)
+_SENTENCE_END = re.compile(r"[.!?](?:\s|$)|\n")
+
+
+def _sentence_around(text, start, end):
+    """The sentence holding text[start:end]."""
+    before = [m.end() for m in _SENTENCE_END.finditer(text, 0, start)]
+    after = _SENTENCE_END.search(text, end)
+    return text[before[-1] if before else 0:after.start() if after else len(text)]
+
+
+def is_ontological(text):
+    """Identity claims this framework forbids, minus the ones already said as a reading."""
+    # Hebrew vowel points are taken off first, so a pointed name (גְּבוּרָה) is caught like a plain one.
+    text = address.without_hebrew_marks(text or "")
+    out = []
+    for m in ONTOLOGICAL.finditer(text):
+        if _HEDGE.search(_sentence_around(text, m.start(), m.end())):
+            continue
+        out.append(m.group(0).strip())
+    return out
+
+
+def has_falsifier(text):
+    """True when the text names an observation that would show the claim wrong."""
+    return bool(FALSIFIER_SHAPE.search(text or ""))
 
 
 def _own_words(value, in_anchors=False):

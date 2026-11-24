@@ -415,6 +415,26 @@ class TestRecordedBypasses(unittest.TestCase):
                 self.assertEqual(E.judgment_words(text), [])
 
 
+class TestIdentityClaims(unittest.TestCase):
+    # Moved into the core on 2026-11-24; reference_agent/governance.py imports these, so there is one copy.
+    def test_an_identity_claim_is_found_and_a_reading_is_not(self):
+        self.assertEqual(E.is_ontological("Anger is Geburah."), ["is Geburah"])
+        self.assertEqual(E.is_ontological("Shin represents Fire."), ["Shin represents"])
+        self.assertEqual(E.is_ontological("Under the Kabbalistic lens, anger reads as Geburah."), [])
+        self.assertEqual(E.is_ontological(""), [])
+        self.assertEqual(E.is_ontological(None), [])
+
+    def test_a_falsifier_names_an_observation(self):
+        self.assertTrue(E.has_falsifier("If the anger stays after rest, then this reading fails."))
+        self.assertFalse(E.has_falsifier("It feels right."))
+        self.assertFalse(E.has_falsifier(None))
+
+    def test_governance_uses_this_copy(self):
+        from reference_agent import governance as G
+        self.assertIs(G.is_ontological, E.is_ontological)
+        self.assertIs(G.has_falsifier, E.has_falsifier)
+
+
 class TestSephirothNames(unittest.TestCase):
     def test_every_spelling_names_one_sephirah_only(self):
         seen = {}
@@ -445,6 +465,7 @@ class TestSephirothNames(unittest.TestCase):
         cases = {"Kether": "Kether", "keter": "Kether", "  TIFERET ": "Tiphareth", "Tifereth": "Tiphareth",
                  "Gevurah": "Geburah", "Hesed": "Chesed", "Chochmah": "Chokmah", "Malchut": "Malkuth",
                  "Da'ath": "Daath", "Da’ath": "Daath", "Daat": "Daath", "Hod": "Hod", "Binah": "Binah",
+                 "Bina": "Binah", "Jesod": "Yesod", "iesod": "Yesod",
                  "גבורה": "Geburah", " כתר ": "Kether", "דעת": "Daath", "גְּבוּרָה": "Geburah", "תִּפְאֶרֶת": "Tiphareth"}
         for word, name in cases.items():
             with self.subTest(word=word):

@@ -33,7 +33,10 @@ gate at the exit can guarantee.
 """
 import re
 
-from symbolics import address, agency
+from symbolics import agency
+# The identity check lives in the core, so symbolics.check and this module share one copy (2026-11-24).
+from symbolics.ethics import (  # noqa: F401  re-exported: callers and tests read them from here
+    FALSIFIER_SHAPE, HEDGED, IS_VERB, ONTOLOGICAL, SYMBOLS, has_falsifier, is_ontological)
 
 CORE_AXIOM = ("True symbolic systems do not believe their own symbols — they operate them with calibrated "
               "epistemic humility as maps, not territory.")
@@ -57,32 +60,6 @@ HYPOTHESIS_DUTIES = ("formally defined in symbolic or mathematical notation",
                      "computationally implementable as an algorithmic sequence",
                      "repeatable from stated initial conditions",
                      "open to empirical testing, with documentable outcomes")
-
-# Claiming identity between a thing and a symbol: what the Core Axiom forbids ("Anger is Geburah").
-# Both directions count. "Anger is Geburah" and "Shin represents Fire" are the same move, and an earlier
-# version of this pattern caught only the first, because it required the symbol to be the object.
-# Keter and Tifereth added 2026-11-22 (outside review): symbolics/metrics.py spells them that way, so "Balance is Tifereth."
-# was not seen as an identity claim.
-# The Sephiroth come from their one definition in symbolics/address.py, in every English spelling and in Hebrew,
-# so a spelling added there is seen here too.
-_SEPHIRAH_NAMES = [n for s in address.SEPHIROTH for n in s.spellings] + list(address.HEBREW_SPELLINGS)
-SYMBOLS = ("|".join(re.escape(n) for n in _SEPHIRAH_NAMES) + "|"
-           r"Aleph|Beth|Gimel|Daleth|Heh|Vav|Vau|Zayin|Zain|Cheth|Teth|Yod|Kaph|Lamed|Mem|Nun|Samekh|"
-           r"Ayin|Peh|Pe|Tzaddi|Qoph|Resh|Shin|Tav|Tau")
-IS_VERB = r"(?:is|are|means|equals|represents|corresponds\s+to)"
-ONTOLOGICAL = re.compile(
-    rf"\b{IS_VERB}\s+(?:the\s+|a\s+|an\s+)?(?:{SYMBOLS})\b"      # a thing IS a symbol
-    rf"|\b(?:{SYMBOLS})\b\s+{IS_VERB}\b",                        # a symbol IS a thing
-    re.IGNORECASE)
-# The same content, said as a reading rather than an identity. These are what the gate wants instead.
-HEDGED = ("reads as", "reads like", "under the", "lens", "one reading", "provisional", "may be read",
-          "corresponds, provisionally", "in this framework", "on this map", "treated as")
-# A falsifier has to name an observation, not a feeling.
-FALSIFIER_SHAPE = re.compile(
-    r"\b(?:if|when|unless|were|should)\b.{0,200}?"
-    r"\b(?:then|would|falsif\w*|refut\w*|disconfirm\w*|contradict\w*|fail\w*|wrong|incorrect|false|"
-    r"invalid\w*|dies|die|break\w*|collaps\w*|does\s+not\s+hold|no\s+longer\s+holds)\b",
-    re.IGNORECASE | re.S)
 
 
 class GovernanceError(Exception):
@@ -110,35 +87,6 @@ def _whole(name, value):
     if isinstance(value, bool) or not isinstance(value, int):
         raise GovernanceError(f"{name} is a whole number, so that it cannot be rounded quietly. Got {value!r}.")
     return value
-
-
-# A hedge counts only as a whole word or phrase, and only in the same sentence as the claim it excuses
-# (2026-11-22, an outside review: "I wiped my camera lens. Anger is Geburah." was excused by the "lens" of another sentence).
-_HEDGE = re.compile(r"\b(?:" + "|".join(re.escape(h) for h in HEDGED) + r")\b", re.IGNORECASE)
-_SENTENCE_END = re.compile(r"[.!?](?:\s|$)|\n")
-
-
-def _sentence_around(text, start, end):
-    """The sentence holding text[start:end]."""
-    before = [m.end() for m in _SENTENCE_END.finditer(text, 0, start)]
-    after = _SENTENCE_END.search(text, end)
-    return text[before[-1] if before else 0:after.start() if after else len(text)]
-
-
-def is_ontological(text):
-    """Identity claims this framework forbids, minus the ones already said as a reading."""
-    # Hebrew vowel points are taken off first, so a pointed name (גְּבוּרָה) is caught like a plain one.
-    text = address.without_hebrew_marks(text or "")
-    out = []
-    for m in ONTOLOGICAL.finditer(text):
-        if _HEDGE.search(_sentence_around(text, m.start(), m.end())):
-            continue
-        out.append(m.group(0).strip())
-    return out
-
-
-def has_falsifier(text):
-    return bool(FALSIFIER_SHAPE.search(text or ""))
 
 
 def occam(claim, explains, plain_explains):

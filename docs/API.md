@@ -201,7 +201,7 @@ symbolics.check(text)
   ├─ ethics.is_directive, ethics.judgment_words      commands, rankings
   ├─ agency.measure, agency.soften                   directive strength (both halves), the offered rewrite
   ├─ agency's single-option pattern, made public     "the only way", "you have no choice"
-  ├─ the identity check now in governance.py         "X is Geburah" with no lens and no falsifier
+  ├─ ethics.is_ontological, ethics.has_falsifier     "X is Geburah" with no lens and no falsifier
   └─ ethics.emit                                     the gate, as for read
 ```
 
@@ -213,12 +213,10 @@ symbolics.check(text)
   and `check` can never disagree on the same words.
 * **`check` waits for the gate fixes.** It promises that what it passes, the gate passes, so the gate must first
   see nested values and stop being excused by words like "considering".
-
-### Still open
-
-* **Where the identity check lives.** It is in `reference_agent/governance.py`, and `symbolics/` never imports
-  `reference_agent/`. Move `is_ontological` and `has_falsifier` into the core (governance then imports them
-  from there, so there is one copy), or leave identity out of `symbolics.check`?
+* **The identity check is in the core** (2026-11-24). `is_ontological` and `has_falsifier` moved, unchanged,
+  from `reference_agent/governance.py` into `symbolics/ethics.py`, because `symbolics/` never imports
+  `reference_agent/`. Governance imports them from there, so there is one copy, and `check` can see
+  identity claims.
 
 ## Fixes underneath, found while writing this (2026-11-22)
 
