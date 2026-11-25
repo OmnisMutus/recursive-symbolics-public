@@ -51,6 +51,10 @@ jobs:
       run: |
         python -m symbolics.outgoing
 
+    - name: Run the range check (every gate must be able to both pass and fail)
+      run: |
+        python -B -m symbolics.range_check
+
     - name: Run the unit tests
       # Until 2026-11-22 this step was named "Unit & Mutation" but ran only the unit tests.
       run: |

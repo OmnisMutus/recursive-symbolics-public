@@ -34,6 +34,7 @@ docstring says what its ground truth is.
 | `test_layers.py` | The architecture index and intent checker. |
 | `test_outgoing.py` | The home-folder path scanner, including a path added and then removed in history. |
 | `test_mutate.py` | The mutation gate itself. |
+| `test_range_check.py` | The range check: its verdict rule, real gates hardcoded to pass and caught as STUCK, and discovery of unregistered gates. |
 | `test_sanitization_audit.py` | That the repository holds no home-folder paths, no private identifiers (see below), and no broken imports. |
 | `athanor_tests/` | The `athanor/` package, plus its planted-bug check `breakit.py`. See its README. |
 | `reference_agent_tests/` | The `reference_agent/` package. See its README. |

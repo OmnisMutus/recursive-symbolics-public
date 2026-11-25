@@ -38,6 +38,7 @@ TARGETS: Dict[str, str] = {
     "symbolics/record.py": "tests.test_record_and_staleness",
     "symbolics/breaches.py": "tests.test_breaches",
     "symbolics/mutate.py": "tests.test_mutate",
+    "symbolics/range_check.py": "tests.test_range_check",
     "symbolics/ledger_history.py": "tests.test_record_and_staleness",
     "symbolics/ledger_staleness.py": "tests.test_record_and_staleness",
     "engines/safe_memory_boundary_engine.py": "tests.test_safe_memory_boundary_engine",

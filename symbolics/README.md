@@ -55,6 +55,7 @@ Each runs as `python -m symbolics.<name>` and exits with an error when it fails.
 | `outgoing.py` | That no local home-folder path is about to be published, in the files or in any commit's patch or message. |
 | `record.py` | That `LIBER_0.md` is only ever added to, by reading its git history. |
 | `breaches.py` | That every FAILED or CORRECTED entry in `LIBER_0.md` names an existing guard, or a reason none can exist. |
+| `range_check.py` | That every gate here can say no: each runs once on an input that should pass and once on one that should fail, through its real code. A gate that gives the same verdict both times is STUCK, and a new `check` or `check_...` function with no such pair registered is UNREGISTERED. |
 | `mutate.py` | The mutation gate: changes comparisons, booleans and arithmetic in a module, one at a time, and reports every change the tests failed to catch. `python -B -m symbolics.mutate --module symbolics/ethics.py` |
 
 ## Before you change anything here
